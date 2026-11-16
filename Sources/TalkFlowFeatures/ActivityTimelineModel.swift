@@ -89,10 +89,7 @@ public final class ActivityTimelineModel {
     /// to one message, and the pane would then show a duration for a different set
     /// of events than the line that was clicked.
     public func timeline(for action: AgentAction) -> ActionTimeline {
-        ActivityRow.rows(from: actions)
-            .first { $0.actions.contains { $0.id == action.id } }?
-            .timeline
-            ?? action.timeline
+        activityRow(for: action)?.timeline ?? action.timeline
     }
 
     /// Nil when the selected row has no durations worth a section — an old row,
@@ -102,7 +99,12 @@ public final class ActivityTimelineModel {
     /// not something another module has business reading.
     var selectedTimelineSection: ActionTimelineSection? {
         guard let selectedAction else { return nil }
-        return ActionTimelineSection.of(timeline(for: selectedAction))
+        let row = activityRow(for: selectedAction)
+        return ActionTimelineSection.of(row?.timeline ?? selectedAction.timeline, timing: row?.timing)
+    }
+
+    private func activityRow(for action: AgentAction) -> ActivityRow? {
+        ActivityRow.rows(from: actions).first { $0.actions.contains { $0.id == action.id } }
     }
 
     /// The run — or the single trigger line — that a record answered, gathered from

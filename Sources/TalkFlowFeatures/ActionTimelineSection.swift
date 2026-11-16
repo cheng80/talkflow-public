@@ -1,6 +1,32 @@
 import Foundation
 import TalkFlowDomain
 
+struct ActivityTiming: Equatable {
+    let draft: TimeInterval?
+    let wait: TimeInterval?
+    let send: TimeInterval?
+    let waitTitle: String
+
+    init(_ timeline: ActionTimeline, firstSendAttempt: Date? = nil) {
+        func stamp(_ stage: ActionStage) -> Date? {
+            timeline.steps.first { $0.stage == stage }?.at
+        }
+
+        func elapsed(from start: Date?, to end: Date?) -> TimeInterval? {
+            guard let start, let end, end >= start else { return nil }
+            return end.timeIntervalSince(start)
+        }
+
+        let answered = stamp(.modelAnswered)
+        let queued = stamp(.queued)
+        let sendAttempt = stamp(.sendAttempted)
+        draft = elapsed(from: stamp(.modelRequested), to: answered)
+        wait = elapsed(from: queued ?? answered, to: firstSendAttempt ?? sendAttempt)
+        send = elapsed(from: sendAttempt, to: stamp(.sent))
+        waitTitle = queued == nil ? "검토 대기" : "전송 대기"
+    }
+}
+
 /// Where the time went, as the 활동 detail pane says it.
 ///
 /// A value rather than branches inside the view, for the reason the whole screen
@@ -27,12 +53,13 @@ struct ActionTimelineSection: Equatable {
     }
 
     let rows: [Row]
+    let timing: ActivityTiming
     /// Start to finish, said once so nobody has to add the column up.
     let total: String
 
     /// Nil when there is nothing to draw: a row written before timings existed, or
     /// one that recorded a single instant and so has no duration to show.
-    static func of(_ timeline: ActionTimeline) -> ActionTimelineSection? {
+    static func of(_ timeline: ActionTimeline, timing: ActivityTiming? = nil) -> ActionTimelineSection? {
         let spans = timeline.spans
         guard spans.count > 1, let total = timeline.duration else { return nil }
 
@@ -47,6 +74,7 @@ struct ActionTimelineSection: Equatable {
                     isSlowest: span.stage == slowest
                 )
             },
+            timing: timing ?? ActivityTiming(timeline),
             total: duration(total)
         )
     }

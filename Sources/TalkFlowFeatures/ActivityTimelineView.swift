@@ -87,11 +87,23 @@ struct ActivityTimelineView: View {
                 }
                 .width(100)
                 TableColumn("단계") { row in
-                    Text(stageSummary(row))
+                    Text(row.reach.title)
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        .help(row.eventCount > 1 ? "기록 \(row.eventCount)개" : row.reach.title)
                 }
-                .width(150)
+                .width(66)
+                TableColumn("초안 생성") { row in
+                    elapsed(row.timing.draft)
+                }
+                .width(75)
+                TableColumn("대기 시간") { row in
+                    elapsed(row.timing.wait, label: row.timing.waitTitle)
+                }
+                .width(130)
+                TableColumn("실제 전송") { row in
+                    elapsed(row.timing.send)
+                }
+                .width(75)
                 TableColumn("내용") { row in
                     Text(row.latest.replyText ?? row.latest.detail)
                         .lineLimit(1)
@@ -129,20 +141,11 @@ struct ActivityTimelineView: View {
         .disabled(model.isLoadingMore)
     }
 
-    /// 「답변까지 · 12.3초」, and the count only when something was actually folded.
-    ///
-    /// The elapsed figure is the whole message's, which is the number somebody who
-    /// came here about a slow reply is looking for. It is omitted rather than shown
-    /// as 0초 for a row with a single stamp: one stamp records that something
-    /// happened, not that it took no time.
-    private func stageSummary(_ row: ActivityRow) -> String {
-        var parts = [row.reach.title]
-        if let seconds = row.timeline.duration, seconds >= 1 {
-            parts.append("\(seconds.formatted(.number.precision(.fractionLength(1))))초")
-        }
-        if row.eventCount > 1 {
-            parts.append("기록 \(row.eventCount)개")
-        }
-        return parts.joined(separator: " · ")
+    private func elapsed(_ seconds: TimeInterval?, label: String? = nil) -> some View {
+        let text = seconds.map { (label.map { "\($0) " } ?? "") + ActionTimelineSection.duration($0) }
+        return Text(text ?? "—")
+            .monospacedDigit()
+            .foregroundStyle(.secondary)
+            .accessibilityLabel(text ?? "시간 기록 없음")
     }
 }

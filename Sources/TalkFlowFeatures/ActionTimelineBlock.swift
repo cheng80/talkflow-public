@@ -14,11 +14,18 @@ struct ActionTimelineBlock: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("걸린 시간").font(.headline)
                 Spacer()
-                Text("전체 \(section.total)")
+                Text("전체 경과 \(section.total)")
                     .font(.callout.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
 
+            measurement("초안 생성", section.timing.draft)
+            measurement(section.timing.waitTitle, section.timing.wait)
+            measurement("실제 전송", section.timing.send)
+
+            Text("단계별 기록")
+                .font(.caption)
+                .foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(section.rows.enumerated()), id: \.element.id) { index, row in
                     if index > 0 { Divider() }
@@ -28,6 +35,19 @@ struct ActionTimelineBlock: View {
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+        }
+    }
+
+    @ViewBuilder
+    private func measurement(_ title: String, _ seconds: TimeInterval?) -> some View {
+        if let seconds {
+            HStack(alignment: .firstTextBaseline) {
+                Text(title)
+                Spacer()
+                Text(ActionTimelineSection.duration(seconds)).monospacedDigit()
+            }
+            .font(.callout)
+            .accessibilityElement(children: .combine)
         }
     }
 
