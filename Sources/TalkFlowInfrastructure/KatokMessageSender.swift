@@ -10,27 +10,27 @@ import TalkFlowDomain
 public struct KatokMessageSender: MessageSender {
     private let executableURL: URL?
     private let environment: KatokEnvironment
-    private let usePolicyAccepted: @Sendable () async -> Bool
+    private let authorization: SendAuthorization
 
     public init(
         fileManager: FileManager = .default,
-        usePolicyAccepted: @escaping @Sendable () async -> Bool
+        authorization: SendAuthorization
     ) {
         self.init(
             executableURL: KatokConnection.findExecutable(using: fileManager),
             environment: KatokEnvironment(),
-            usePolicyAccepted: usePolicyAccepted
+            authorization: authorization
         )
     }
 
     init(
         executableURL: URL?,
         environment: KatokEnvironment,
-        usePolicyAccepted: @escaping @Sendable () async -> Bool
+        authorization: SendAuthorization
     ) {
         self.executableURL = executableURL
         self.environment = environment
-        self.usePolicyAccepted = usePolicyAccepted
+        self.authorization = authorization
     }
 
     /// Focus is always taken at once, including with somebody in front of a
@@ -68,7 +68,7 @@ public struct KatokMessageSender: MessageSender {
     /// A person pressing 보내기 gets the other answer. They are watching, they
     /// asked for this message now, and a window moving is what they expect.
     static func arguments(chatRoomID: String, origin: SendOrigin) -> [String] {
-        var arguments = ["send", "--chat", chatRoomID, "--take-focus-now", "--accept-use-policy"]
+        var arguments = ["send", "--via", "ax", "--chat", chatRoomID, "--take-focus-now", "--accept-use-policy"]
         if origin == .automatic { arguments.append("--no-open") }
         return arguments
     }
@@ -82,24 +82,22 @@ public struct KatokMessageSender: MessageSender {
         guard let executableURL else {
             throw MessageSendFailure(message: "katok 실행 파일을 찾을 수 없습니다.", isRetryable: false)
         }
-        guard await usePolicyAccepted() else {
-            throw MessageSendFailure(message: "전송 이용 정책에 동의해야 전송할 수 있습니다.", isRetryable: false)
-        }
-
-        // The connector derives its database from a cached account id, so the
-        // same override the reads use has to travel with the write. Without it a
-        // send would leave from the account that was signed out.
-        let katokEnvironment = environment.katokProcessEnvironment()
-
         // The same every time round now that the screen no longer changes the
         // answer, so it is built once rather than per attempt.
         let arguments = Self.arguments(chatRoomID: chatRoomID, origin: origin)
+        let katokEnvironment = environment.katokProcessEnvironment()
 
         var lastFailure: MessageSendFailure?
         for attempt in 0..<Self.attemptLimit {
             if attempt > 0 {
-                try? await Task.sleep(for: Self.retryDelay)
+                try await Task.sleep(for: Self.retryDelay)
             }
+            guard !katokEnvironment.isEmpty,
+                  attempt == 0 || environment.katokProcessEnvironment() == katokEnvironment
+            else {
+                throw MessageSendFailure(message: "현재 카카오톡 계정을 확인할 수 없어 전송하지 않았습니다.", isRetryable: false)
+            }
+            try await authorization.check(origin)
 
             let result = await Task.detached {
                 // The message body goes over stdin, which katok reads when

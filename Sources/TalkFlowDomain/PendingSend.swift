@@ -89,8 +89,7 @@ public protocol PendingSendStore: Sendable {
 /// them from themselves, and only one of the two makes sense when they pressed
 /// the button.
 public enum SendOrigin: Equatable, Sendable {
-    /// The queue decided the conditions were met. Nobody asked for this now, and
-    /// nobody is expecting KakaoTalk to move.
+    /// Started without someone pressing 보내기 on this Mac.
     case automatic
     /// A person pressed 보내기 and is watching for it to happen.
     case userRequested

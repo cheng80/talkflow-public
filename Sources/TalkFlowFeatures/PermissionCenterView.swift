@@ -14,7 +14,7 @@ public struct PermissionCenterView: View {
                 Divider()
                 permissionRow(
                     title: "접근성",
-                    detail: "자동 전송을 켤 때만 필요합니다. 초안 생성만 사용할 경우에는 필요하지 않습니다.",
+                    detail: "앱에서 전송할 때 필요합니다. 초안 생성만 할 때는 필요하지 않습니다.",
                     destination: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
                 )
             }

@@ -40,7 +40,7 @@ func aSendSomeoneCouldSeeAlsoTakesFocusRatherThanInterruptingThreeTimes() {
 func everySendAddressesTheRoomByIdAndCarriesTheAcceptedPolicy() {
     let arguments = KatokMessageSender.arguments(chatRoomID: "42", origin: .automatic)
 
-    #expect(arguments.first == "send")
+    #expect(arguments.starts(with: ["send", "--via", "ax"]))
     #expect(!arguments.contains("--room"))
     #expect(arguments.contains("--chat"))
     #expect(arguments.contains("42"))
@@ -87,6 +87,10 @@ func aPassingScreenStateIsNotBlamedOnAClosedWindow() {
 
 // MARK: - Choosing between the two ways of sending
 
+private let authorized = SendAuthorization(
+    usePolicyAccepted: { true }, automaticResponsesEnabled: { true }
+)
+
 private actor RecordingSender: MessageSender {
     private(set) var calls: [String] = []
     private let failure: Error?
@@ -109,6 +113,43 @@ private actor RecordingSender: MessageSender {
     }
 }
 
+@Test(arguments: [SendOrigin.automatic, .userRequested])
+func missingConsentNeverReachesEitherSendRoute(origin: SendOrigin) async {
+    let direct = RecordingSender()
+    let katok = RecordingSender()
+    let sender = AccessibilityFirstMessageSender(
+        direct: direct,
+        fallback: katok,
+        authorization: SendAuthorization(usePolicyAccepted: { false }, automaticResponsesEnabled: { true })
+    )
+
+    await #expect(throws: MessageSendFailure.self) {
+        try await sender.send(text: "산책 갈까요", toChatRoomID: "42", named: "산책 모임", origin: origin)
+    }
+    #expect(await direct.calls.isEmpty)
+    #expect(await katok.calls.isEmpty)
+}
+
+@Test
+func automaticFallbackRechecksPauseAfterDirectRefusal() async {
+    let direct = RecordingSender(failure: MessageSendFailure(message: "창이 닫혔습니다.", isRetryable: true))
+    let katok = RecordingSender()
+    let sender = AccessibilityFirstMessageSender(
+        direct: direct,
+        fallback: katok,
+        authorization: SendAuthorization(
+            usePolicyAccepted: { true },
+            automaticResponsesEnabled: { await direct.calls.isEmpty }
+        )
+    )
+
+    await #expect(throws: MessageSendFailure.self) {
+        try await sender.send(text: "책 챙겼어요", toChatRoomID: "42", named: "독서 모임", origin: .automatic)
+    }
+    #expect(await direct.calls.count == 1)
+    #expect(await katok.calls.isEmpty)
+}
+
 /// Typing straight into the window takes no focus and is the only thing that
 /// works behind a shut lid, so it is tried first and katok is never woken.
 @Test
@@ -116,7 +157,7 @@ func katokIsNotRunWhenTypingDirectlyWorked() async throws {
     let direct = RecordingSender()
     let katok = RecordingSender()
 
-    try await AccessibilityFirstMessageSender(direct: direct, fallback: katok)
+    try await AccessibilityFirstMessageSender(direct: direct, fallback: katok, authorization: authorized)
         .send(text: "네", toChatRoomID: "42", named: "가족", origin: .automatic)
 
     #expect(await direct.calls == ["네"])
@@ -133,7 +174,7 @@ func aRefusalToTypeDirectlyHandsTheMessageToKatok() async throws {
     )
     let katok = RecordingSender()
 
-    try await AccessibilityFirstMessageSender(direct: direct, fallback: katok)
+    try await AccessibilityFirstMessageSender(direct: direct, fallback: katok, authorization: authorized)
         .send(text: "네", toChatRoomID: "42", named: "가족", origin: .automatic)
 
     #expect(await katok.calls == ["네"])
@@ -146,7 +187,8 @@ func aTerminalFailureIsNotRetriedThroughKatok() async {
     let katok = RecordingSender()
     let sender = AccessibilityFirstMessageSender(
         direct: RecordingSender(failure: MessageSendFailure(message: "동의 필요", isRetryable: false)),
-        fallback: katok
+        fallback: katok,
+        authorization: authorized
     )
 
     await #expect(throws: MessageSendFailure.self) {
@@ -243,7 +285,8 @@ func typingSomewhereElseIsNotHandedToKatok() async {
                 cause: .keyboardInUse
             )
         ),
-        fallback: katok
+        fallback: katok,
+        authorization: authorized
     )
 
     await #expect(throws: MessageSendFailure.self) {
@@ -260,7 +303,8 @@ func waitingOutTheKeyboardKeepsTheReply() async {
         direct: RecordingSender(
             failure: MessageSendFailure(message: "키보드 사용 중", isRetryable: true, cause: .keyboardInUse)
         ),
-        fallback: RecordingSender()
+        fallback: RecordingSender(),
+        authorization: authorized
     )
 
     do {
@@ -283,7 +327,8 @@ func aRefusalAboutTheMethodStillReachesKatok() async throws {
         direct: RecordingSender(
             failure: MessageSendFailure(message: "창이 열려 있지 않습니다.", isRetryable: true)
         ),
-        fallback: katok
+        fallback: katok,
+        authorization: authorized
     )
 
     try await sender.send(text: "네", toChatRoomID: "42", named: "가족", origin: .automatic)
@@ -301,7 +346,7 @@ func aRefusalAboutTheMethodStillReachesKatok() async throws {
 func aReceiptSaysWhichRouteDeliveredTheMessage() async throws {
     let direct = RecordingSender()
 
-    let receipt = try await AccessibilityFirstMessageSender(direct: direct, fallback: RecordingSender())
+    let receipt = try await AccessibilityFirstMessageSender(direct: direct, fallback: RecordingSender(), authorization: authorized)
         .send(text: "네", toChatRoomID: "42", named: "가족", origin: .automatic)
 
     #expect(receipt.route == .direct)
@@ -319,7 +364,8 @@ func aReceiptSaysWhyTheDirectRouteWasNotUsed() async throws {
 
     let receipt = try await AccessibilityFirstMessageSender(
         direct: refused,
-        fallback: RecordingSender(route: .katok)
+        fallback: RecordingSender(route: .katok),
+        authorization: authorized
     )
     .send(text: "네", toChatRoomID: "42", named: "가족", origin: .automatic)
 

@@ -12,13 +12,12 @@ import TalkFlowDomain
 /// A room that is not a console never parses anything, so an ordinary line with a
 /// leading `!` there is just a message.
 ///
-/// It runs at the very top of a room's turn, before the global-responses switch
-/// and the room's own mode are consulted, so a command works even when responses
-/// are paused or the console is set to answer nobody. When it consumes a command
-/// the caller skips normal drafting for that room.
+/// Commands are independent of the room's normal response mode. The global
+/// switch and use-policy consent still apply.
 public struct HandleAdminCommand: Sendable {
     let connection: any KakaoConnection
     let sender: any MessageSender
+    let settingsStore: any AppSettingsStore
     let policyStore: any RoomPolicyStore
     let adminRoomStore: any AdminRoomStore
     /// Optional for the same reason it is everywhere else: a build without a
@@ -39,6 +38,7 @@ public struct HandleAdminCommand: Sendable {
     public init(
         connection: any KakaoConnection,
         sender: any MessageSender,
+        settingsStore: any AppSettingsStore,
         policyStore: any RoomPolicyStore,
         adminRoomStore: any AdminRoomStore,
         personNotes: (any PersonNoteStore)? = nil,
@@ -47,6 +47,7 @@ public struct HandleAdminCommand: Sendable {
     ) {
         self.connection = connection
         self.sender = sender
+        self.settingsStore = settingsStore
         self.policyStore = policyStore
         self.adminRoomStore = adminRoomStore
         self.personNotes = personNotes
@@ -72,7 +73,8 @@ public struct HandleAdminCommand: Sendable {
         // 1. The fence. Everything past here trusts the room's text; a room that
         // was never designated a console never gets here.
         guard let adminRoomIDs = try? await adminRoomStore.adminRoomIDs(accountFingerprint: account.fingerprint),
-              adminRoomIDs.contains(roomID)
+              adminRoomIDs.contains(roomID),
+              await commandsEnabled()
         else {
             return false
         }
@@ -108,6 +110,7 @@ public struct HandleAdminCommand: Sendable {
         // 4. Parse. An unknown verb still gets an answer, but only when the line
         // was meant as a command — it opens with the prefix. A plain line falls
         // through to normal drafting untouched.
+        guard await commandsEnabled() else { return false }
         guard let command = AdminCommandParser.parse(latest.body) else {
             guard latest.body.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix(AdminCommandParser.prefix) else {
                 return false
@@ -122,12 +125,15 @@ public struct HandleAdminCommand: Sendable {
         return true
     }
 
+    private func commandsEnabled() async -> Bool {
+        guard (try? await settingsStore.sendUsePolicyAccepted()) == true else { return false }
+        return (try? await settingsStore.globalResponsesEnabled()) == true
+    }
+
     /// Sends the answer straight into the console room and records what happened.
     ///
-    /// Direct like `ReviewDrafts.send`, not through the queue: the operator is
-    /// present by definition, so `.userRequested` is the honest origin and the
-    /// idle/settling checks that guard automatic delivery do not apply. A send
-    /// that throws is recorded as `.failed` rather than swallowed — the row still
+    /// The operator can be away from this Mac, so the sender treats it as
+    /// automatic. A send that throws is recorded as `.failed` — the row still
     /// keys on the trigger message, so dedup holds and the console is not answered
     /// twice, and the operator can re-type to try again.
     private func respond(
@@ -144,7 +150,7 @@ public struct HandleAdminCommand: Sendable {
                 // The room's name, because KakaoTalk titles its windows by it and
                 // the sender has nothing else to find the window by.
                 named: room.displayName,
-                origin: .userRequested
+                origin: .automatic
             )
             timeline.stamp(.sent, note: receipt.explanation)
             try? await actionLog.record(action(kind: .commanded, in: room, to: latest, account: account, replyText: text, detail: "관리자 명령에 답했습니다.", timeline: timeline))

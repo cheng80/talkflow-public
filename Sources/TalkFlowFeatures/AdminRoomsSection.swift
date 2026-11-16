@@ -21,7 +21,7 @@ struct AdminRoomsSection: View {
 
     var body: some View {
         Section {
-            Text("이 방에서는 ! 로 시작하는 명령을 입력하면 TalkFlow가 그 방에 답합니다. !? 로 명령 목록을 봅니다. 응답이 꺼진 방에서도 명령은 동작합니다.")
+            Text("이 방에서는 ! 로 시작하는 명령에 답합니다. 전역 자동 응답과 전송 동의가 필요합니다. 카카오톡에서 이 방의 대화창을 열어두세요. !? 로 명령 목록을 봅니다.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             // Said where the switch is, because this is the one place the app

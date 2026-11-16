@@ -55,12 +55,14 @@ private func makeHandler(
     messagesByRoom: [String: [ChatMessage]],
     policies: [RoomPolicy] = [],
     personNotes: (any PersonNoteStore)? = nil,
-    actionLog: FakeActionLog = FakeActionLog()
+    actionLog: FakeActionLog = FakeActionLog(),
+    settingsStore: FakeSettingsStore = FakeSettingsStore()
 ) -> (handler: HandleAdminCommand, sender: FakeMessageSender, log: FakeActionLog) {
     let sender = FakeMessageSender()
     let handler = HandleAdminCommand(
         connection: FakeKakaoConnection(rooms: rooms, messagesByRoom: messagesByRoom),
         sender: sender,
+        settingsStore: settingsStore,
         policyStore: FakePolicyStore(policies),
         adminRoomStore: FakeAdminRoomStore(adminRooms),
         personNotes: personNotes,
@@ -71,6 +73,22 @@ private func makeHandler(
 
 private func line(_ body: String, id: String = "m1", in room: ChatRoom = testGroupRoom) -> [String: [ChatMessage]] {
     [room.id: [testMessage(id: id, roomID: room.id, body: body)]]
+}
+
+@Test(arguments: [false, true])
+func adminCommandsCannotChangeSettingsOrSendWhenPausedOrWithoutConsent(paused: Bool) async {
+    let settings = FakeSettingsStore(enabled: !paused, usePolicyAccepted: paused)
+    let (handler, sender, log) = makeHandler(
+        adminRooms: [testGroupRoom.id],
+        messagesByRoom: line("!켬 2"),
+        settingsStore: settings
+    )
+
+    #expect(!(await handler.handle(roomID: testGroupRoom.id, account: testAccount)))
+    let policy = try? await handler.policyStore.policy(for: testGroupRoom, accountFingerprint: testAccount.fingerprint)
+    #expect(policy?.responseMode == .off)
+    #expect(await sender.sent.isEmpty)
+    #expect(await log.recorded.isEmpty)
 }
 
 @Test
@@ -270,6 +288,7 @@ private func makeSettingHandler(
     let handler = HandleAdminCommand(
         connection: FakeKakaoConnection(rooms: [testDirectRoom, testGroupRoom], messagesByRoom: line(body)),
         sender: sender,
+        settingsStore: FakeSettingsStore(),
         policyStore: store,
         adminRoomStore: FakeAdminRoomStore([testGroupRoom.id]),
         personNotes: nil,
@@ -409,6 +428,7 @@ func settingAnnouncesTheWrittenRoomSoTheUICanRefreshIt() async {
     let handler = HandleAdminCommand(
         connection: FakeKakaoConnection(rooms: [testDirectRoom, testGroupRoom], messagesByRoom: line("!세팅 2 응답 자동")),
         sender: FakeMessageSender(),
+        settingsStore: FakeSettingsStore(),
         policyStore: FakePolicyStore([RoomPolicy(accountFingerprint: testAccount.fingerprint, chatRoomID: testGroupRoom.id, responseMode: .mentionOnly)]),
         adminRoomStore: FakeAdminRoomStore([testGroupRoom.id]),
         personNotes: nil,
@@ -428,6 +448,7 @@ func aBadSettingValueAnnouncesNothing() async {
     let handler = HandleAdminCommand(
         connection: FakeKakaoConnection(rooms: [testDirectRoom, testGroupRoom], messagesByRoom: line("!세팅 2 응답 헐")),
         sender: FakeMessageSender(),
+        settingsStore: FakeSettingsStore(),
         policyStore: FakePolicyStore([RoomPolicy(accountFingerprint: testAccount.fingerprint, chatRoomID: testGroupRoom.id, responseMode: .mentionOnly)]),
         adminRoomStore: FakeAdminRoomStore([testGroupRoom.id]),
         personNotes: nil,
@@ -451,6 +472,7 @@ func togglingARoomOffSetsResponseModeAndRefreshesTheUI() async {
     let handler = HandleAdminCommand(
         connection: FakeKakaoConnection(rooms: [testDirectRoom, testGroupRoom], messagesByRoom: line("!끔 2")),
         sender: sender,
+        settingsStore: FakeSettingsStore(),
         policyStore: store,
         adminRoomStore: FakeAdminRoomStore([testGroupRoom.id]),
         personNotes: nil,
@@ -546,6 +568,7 @@ func applyingTheFullPresetWritesAllOfItAndRefreshesTheUI() async {
     let handler = HandleAdminCommand(
         connection: FakeKakaoConnection(rooms: [testDirectRoom, testGroupRoom], messagesByRoom: line("!프리셋 2 풀")),
         sender: sender,
+        settingsStore: FakeSettingsStore(),
         policyStore: store,
         adminRoomStore: FakeAdminRoomStore([testGroupRoom.id]),
         personNotes: nil,

@@ -22,14 +22,19 @@ enum TalkFlowComposition {
         let personNotes = personNotes()
         let adminStore = adminRoomStore()
         let settings = ManageAppSettings(store: settingsStore)
-        let sender = messageSender(settingsStore: settingsStore)
+        let responseControl = ResponseControlModel(settings: settings, wakefulness: MacWakefulnessController())
+        let settingsModel = SettingsModel(settings: settings)
+        let sender = messageSender(authorization: SendAuthorization(
+            usePolicyAccepted: {
+                guard (try? await settingsStore.sendUsePolicyAccepted()) == true else { return false }
+                return await settingsModel.sendUsePolicyAccepted
+            },
+            automaticResponsesEnabled: { await responseControl.isEnabled }
+        ))
         let model = aiModel(settingsStore: settingsStore)
 
         let models = TalkFlowModels(
-            responseControl: ResponseControlModel(
-                settings: settings,
-                wakefulness: MacWakefulnessController()
-            ),
+            responseControl: responseControl,
             aiConnection: AIConnectionModel(connection: CodexCLIConnection()),
             chatRooms: ChatRoomListModel(
                 loadRooms: LoadRoomsWithPolicies(
@@ -83,7 +88,7 @@ enum TalkFlowComposition {
                 ),
                 sendStore: sendStore
             ),
-            settings: SettingsModel(settings: settings),
+            settings: settingsModel,
             loadStatus: LoadConnectionStatus(connection: kakao),
             // The only place admin mode is switched. The store is nil without a
             // database, and the section degrades exactly as the others do.
@@ -108,6 +113,7 @@ enum TalkFlowComposition {
             HandleAdminCommand(
                 connection: kakao,
                 sender: sender,
+                settingsStore: settingsStore,
                 policyStore: policyStore,
                 adminRoomStore: store,
                 personNotes: personNotes,
@@ -137,12 +143,12 @@ enum TalkFlowComposition {
                 burningStore: burningStore,
                 personNotes: personNotes
             ),
-            // Runs at the top of each room's turn, ahead of the pipeline's own
-            // gates, so a command is honored even in a paused or answer-nobody
-            // console. The account is resolved inside the use case, like the
-            // pipeline resolves its own.
+            // The live switch closes the window before the stop is saved.
             adminCommand: handleAdminCommand.map { handler in
-                { @Sendable roomID in await handler.handle(roomID: roomID) }
+                { @Sendable roomID in
+                    guard await responseControl.isEnabled, await settingsModel.sendUsePolicyAccepted else { return false }
+                    return await handler.handle(roomID: roomID)
+                }
             }
         )
         // Rides the send queue's poll rather than the sync stream: the rooms this
@@ -176,14 +182,11 @@ enum TalkFlowComposition {
         return models
     }
 
-    /// The sender reads the acceptance at call time rather than capturing it, so
-    /// revoking consent takes effect on the very next send.
-    private static func messageSender(settingsStore: any AppSettingsStore) -> any MessageSender {
+    private static func messageSender(authorization: SendAuthorization) -> any MessageSender {
         AccessibilityFirstMessageSender(
             direct: AccessibilityMessageSender(),
-            fallback: KatokMessageSender {
-                (try? await settingsStore.sendUsePolicyAccepted()) ?? false
-            }
+            fallback: KatokMessageSender(authorization: authorization),
+            authorization: authorization
         )
     }
 

@@ -149,10 +149,7 @@ public final class TalkFlowModels {
         let detectedAt = detectedAtByRoom.removeValue(forKey: roomID)
         let synchronizedAt = synchronizedAtByRoom.removeValue(forKey: roomID) ?? Date()
         draftingJobs[roomID] = Task { @MainActor [weak self] in
-            // Admin console commands run first, before the global-responses switch
-            // and the room-mode gate that live inside draftReplies — so a command
-            // works even when responses are paused or the console is set to answer
-            // nobody. A consumed command skips drafting for this room entirely.
+            // A consumed command skips normal drafting for this room.
             let consumed = await self?.adminCommand?(roomID) ?? false
             if !consumed {
                 await draftReplies(

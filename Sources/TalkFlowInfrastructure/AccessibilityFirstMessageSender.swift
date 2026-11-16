@@ -15,10 +15,12 @@ import TalkFlowDomain
 public struct AccessibilityFirstMessageSender: MessageSender {
     private let direct: any MessageSender
     private let fallback: any MessageSender
+    private let authorization: SendAuthorization
 
-    public init(direct: any MessageSender, fallback: any MessageSender) {
+    public init(direct: any MessageSender, fallback: any MessageSender, authorization: SendAuthorization) {
         self.direct = direct
         self.fallback = fallback
+        self.authorization = authorization
     }
 
     public func send(
@@ -27,6 +29,7 @@ public struct AccessibilityFirstMessageSender: MessageSender {
         named chatRoomName: String,
         origin: SendOrigin
     ) async throws -> SendReceipt {
+        try await authorization.check(origin)
         do {
             return try await direct.send(
                 text: text,
@@ -41,6 +44,7 @@ public struct AccessibilityFirstMessageSender: MessageSender {
             // the user was searching for — the polite path declined and handed
             // the job to the one that would not.
             guard failure.allowsAnotherAttemptNow else { throw failure }
+            try await authorization.check(origin)
             // Why the cheap route was unavailable travels with the receipt. It
             // is nearly always the same sentence — the room's window is not
             // open — and knowing that is knowing why a send took twenty seconds
