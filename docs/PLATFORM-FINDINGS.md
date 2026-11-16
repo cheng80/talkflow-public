@@ -257,6 +257,8 @@ kakaocli도 같은 순서다: `activate` → 채팅 탭 `AXPress` → 행 선택
 
 ### 5.1 모델 목록을 알려 주는 명령은 없다
 
+확인 (2026-11-16 · codex-cli 0.169.0-alpha.11.1): 표시용 캐시와 [Codex 모델 안내](https://learn.chatgpt.com/docs/models?surface=cli)를 대조했다. `gpt-6-astra`, `gpt-6.1-sol`, `gpt-6.1-terra`, `gpt-6-sol`, `gpt-6-luna`를 TalkFlow의 답장 스키마와 실행 옵션으로 각각 호출했고, 합성 문장에 대한 유효한 응답이 5개 모두 돌아왔다.
+
 `codex --help`와 `codex exec --help` 어디에도 모델을 열거하는 곳이 없고, `models`나 `model list` 같은 하위 명령도 없다. 목록이 있는 곳은 `~/.codex/models_cache.json` 하나다. CLI가 자기 필요에 따라 갱신하는 비공개 파일이라 TalkFlow는 읽지 않고 이름만 베껴 둔다. 형식이 바뀌면 답장이 전부 죽고, 이름이 낡으면 선택 항목 하나가 낡을 뿐이다.
 
 확인 (2026-08-11 · codex-cli 0.147.0): 캐시에 8개가 있고 그중 `visibility: "list"`이면서 `supported_in_api: true`인 것이 6개다.

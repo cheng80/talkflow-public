@@ -20,56 +20,33 @@ public struct AIModel: Identifiable, Hashable, Sendable {
 }
 
 public extension AIModel {
-    /// The models `codex exec --model` accepts, as the installed CLI lists them.
-    ///
-    /// Names read off `~/.codex/models_cache.json` on 2026-08-11 with codex-cli
-    /// 0.147.0 — the CLI has no `models` subcommand and no `--help` text that
-    /// enumerates them, so that cache is the only place the list exists. It is
-    /// the CLI's private file and it gets refreshed behind us, which is why this
-    /// list is copied rather than read: a format change there would break every
-    /// reply, and a stale name here only costs a picker row.
-    ///
-    /// Every id below was then *run*, once each, through the same locked-down
-    /// invocation a reply uses — flags, schema, prompt on stdin — and each wrote
-    /// a schema-valid answer back. A name in that cache is not evidence it
-    /// works: `--model not-a-real-model-xyz` is accepted by the CLI without
-    /// complaint and fails only at the API, with
-    /// `400 invalid_request_error`, so an unverified id would ship as a picker
-    /// row that breaks every reply the moment somebody chose it.
-    ///
-    /// Absent on purpose:
-    ///
-    /// - `gpt-5.4` and `gpt-5.4-mini`. Both ran, and the cache marks both for
-    ///   deprecation and redirects them to `gpt-5.6-terra` and `gpt-5.6-luna`.
-    ///   Offering a choice the provider has announced the end of buys the user a
-    ///   reply that stops working on a date nobody told them.
-    /// - `gpt-5.6-sol-wm` and `codex-auto-review`, which the cache hides. The
-    ///   first is a Work Mode routing alias the cache marks unsupported over the
-    ///   API — it ran anyway, which is the sort of thing hidden means — and the
-    ///   second is the model Codex reviews its own commands with.
-    ///
-    /// An id that has left this list does not disappear from the screen — see
-    /// `named(_:)`.
+    /// Models that returned valid output using TalkFlow's reply schema.
+    /// Keep saved choices outside this list visible through `named(_:)`.
     static let catalog: [AIModel] = [
         AIModel(
-            id: "gpt-5.6-sol",
-            name: "GPT-5.6 Sol",
-            summary: "가장 좋은 모델입니다. 느리고 사용량을 많이 씁니다."
+            id: "gpt-6-astra",
+            name: "GPT-6 Astra",
+            summary: "복잡한 요청을 처리하는 최상위 모델입니다."
         ),
         AIModel(
-            id: "gpt-5.6-terra",
-            name: "GPT-5.6 Terra",
-            summary: "속도와 품질이 균형 잡힌 모델입니다."
+            id: "gpt-6.1-sol",
+            name: "GPT-6.1 Sol",
+            summary: "복잡한 작업에서 품질과 사용량의 균형을 맞춘 모델입니다."
         ),
         AIModel(
-            id: "gpt-5.6-luna",
-            name: "GPT-5.6 Luna",
-            summary: "가장 빠르고 싼 모델입니다."
+            id: "gpt-6.1-terra",
+            name: "GPT-6.1 Terra",
+            summary: "글쓰기와 이미지 이해에 적합한 빠른 모델입니다."
         ),
         AIModel(
-            id: "gpt-5.5",
-            name: "GPT-5.5",
-            summary: "이전 세대의 가장 좋은 모델입니다."
+            id: "gpt-6-sol",
+            name: "GPT-6 Sol",
+            summary: "6.1 이전의 범용 Sol 모델입니다."
+        ),
+        AIModel(
+            id: "gpt-6-luna",
+            name: "GPT-6 Luna",
+            summary: "짧은 답변이나 반복 작업의 사용량을 줄이는 모델입니다."
         )
     ]
 
