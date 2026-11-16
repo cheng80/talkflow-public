@@ -96,7 +96,7 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
                 Link(
                     "katok 이용 정책과 면책 고지 읽기",
-                    destination: URL(string: "https://github.com/NomaDamas/katok")!
+                    destination: URL(string: "https://github.com/cheng80/katok#readme")!
                 )
                 .font(.footnote)
                 // Named only 유휴 상태 자동 전송 until 상시 전송 existed, so the one

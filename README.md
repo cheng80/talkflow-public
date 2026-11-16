@@ -56,29 +56,36 @@ AI 제공자로 나가야 합니다. 방 설정에 따라 사진, 링크가 가�
 
 | | |
 |---|---|
-| macOS | 15 이상 |
+| macOS | Apple Silicon, macOS 15 이상 |
 | 카카오톡 | macOS 앱, 로그인된 상태 |
-| [katok](https://github.com/NomaDamas/katok) | 0.3.0 — 카카오톡 로컬 DB 읽기와 증분 동기화 |
+| [cheng80/katok](https://github.com/cheng80/katok) | 비공개 소스 접근 권한과 Rust 1.91 이상 — 카카오톡 로컬 DB 읽기와 증분 동기화 |
 | [Codex CLI](https://github.com/openai/codex) | 초안을 쓰는 모델 호출. 별도 로그인이 필요합니다 |
 | 전체 디스크 접근 | **초안만 쓸 때도 필요합니다.** 카카오톡의 로컬 대화를 읽는 데 씁니다 |
-| 접근성 권한 | 자동 전송에만 필요합니다. 초안만 쓸 때는 필요 없습니다 |
+| 접근성 권한 | 앱에서 전송할 때 필요합니다. 초안 생성만 할 때는 필요 없습니다 |
 
-권한 없이 카카오톡 컨테이너를 열거하면 에러가 아니라 **돌아오지 않는 호출**이
-됩니다. 앱이 「감지 중」 초록불을 켠 채로 멈춘 것처럼 보이면 대개 전체 디스크
-접근이 빠진 것입니다 ([PLATFORM-FINDINGS 8.2](docs/PLATFORM-FINDINGS.md)).
+대화 감지가 「응답 없음」이면 전체 디스크 접근과 macOS 권한 요청 창을 확인하세요
+([PLATFORM-FINDINGS 8.2](docs/PLATFORM-FINDINGS.md)).
 
-katok은 Homebrew tap이 없어서 릴리스 아카이브를 고정 버전으로 내려받고 게시된
-SHA-256을 검증한 뒤 설치합니다.
+`cheng80/katok`은 비공개이며 공개 설치 파일은 없습니다. 접근 권한이 있는 사용자가
+직접 체크아웃을 빌드합니다. 아래는 TalkFlow 연동 계약을 확인한 소스 리비전입니다.
 
 ```bash
-scripts/install-katok.sh
+git clone https://github.com/cheng80/katok.git ../katok
+git -C ../katok checkout --detach 592565a25ead05b46010000f220373ce3ed24acc
+scripts/install-katok.sh ../katok
 ```
+
+스크립트는 `/opt/homebrew/bin`에 설치합니다. 해당 경로를 쓸 수 없다면 두 번째
+인자로 `/usr/local/bin`을 지정할 수 있습니다. 설치 뒤 앱 번들을 빌드하세요.
+katok이 들어간 번들은 이 Mac에서 사용합니다.
 
 ## 빌드
 
 ```bash
 TALKFLOW_BUNDLE_ID=com.yourdomain.talkflow scripts/build-app.sh --install
 ```
+
+Swift 6 이상과 유효한 `Developer ID Application` 서명 인증서가 필요합니다.
 
 번들 ID는 역DNS라 **본인이 소유한 도메인**이어야 합니다. 그리고 이 값을 한 번
 정하면 바꾸지 마세요 — macOS의 접근성·자동화 승인은 번들 ID와 팀 ID에 걸려 있어서,
@@ -170,8 +177,9 @@ katok sync — 최소 간격을 두고 증분 동기화
   감지 → 동기화 → 규칙 판단 → 대기열 → 전송 시도 → 전송의 단계별 소요 시간을
   들고 있어서, 답장이 2분 걸렸을 때 **어느 2분이었는지** 알 수 있습니다
 - **전송 대기열** — 나가기를 기다리는 초안. 고쳐서 보내거나 버릴 수 있습니다
-- **관리자 방** — 지정한 방에서 `!` 명령으로 설정을 읽고 바꿉니다. 맥 앞에 없을 때
-  씁니다
+- **관리자 방** — 지정한 방에서 `!` 명령으로 설정을 읽고 바꿉니다. 전역 자동 응답과
+  전송 동의가 켜져 있어야 하고, 카카오톡에서 그 방의 대화창을 열어둬야 답을 받을 수
+  있습니다. 긴급 중지는 관리자 응답도 막습니다.
 
 ## 어떻게 보이는가
 

@@ -36,7 +36,7 @@ TalkFlow/
 │   ├── ARCHITECTURE.md       # 이 문서 — 모듈 구조와 경계
 │   └── PLATFORM-FINDINGS.md  # 카카오톡·macOS·katok 실측 기록
 ├── scripts/
-│   └── install-katok.sh      # katok CLI 설치(체크섬 검증 포함)
+│   └── install-katok.sh      # 권한 있는 katok 체크아웃에서 CLI 빌드 및 설치
 ├── Sources/
 │   ├── TalkFlowApp/          # 앱 시작점, 의존성 조립
 │   ├── TalkFlowDomain/       # 모델, 정책, 포트
@@ -63,10 +63,10 @@ TalkFlow/
 
 | 대상 | 용도 | 확보 방법 |
 | --- | --- | --- |
-| `katok` CLI | 카카오톡 로컬 DB 읽기, 증분 동기화, UI 전송 | `scripts/install-katok.sh` |
+| `katok` CLI | 카카오톡 로컬 DB 읽기, 증분 동기화, AX 대체 전송 | [katok 소스 설치](../README.md#필요한-것) |
 | GRDB | TalkFlow 로컬 저장소, katok 아카이브 읽기 | SPM 의존성 |
 
-`katok`은 Homebrew tap을 제공하지 않으므로 릴리스 아카이브를 고정 버전으로 내려받고 게시된 SHA-256을 검증한 뒤 설치한다. `KatokConnection`은 앱 번들, `/opt/homebrew/bin`, `/usr/local/bin` 순으로 실행 파일을 찾는다.
+`KatokConnection`은 앱 번들, `/opt/homebrew/bin`, `/usr/local/bin` 순으로 실행 파일을 찾는다. katok으로 전송할 때는 `--via ax`를 명시해 현재 로그인된 macOS 카카오톡 앱을 사용한다.
 
 katok의 아카이브(`~/Library/Application Support/katok/archive.sqlite3`)는 katok이 소유하고 TalkFlow는 읽기 전용으로만 접근한다. 이 스키마 결합은 `TalkFlowInfrastructure` 안에 가두고, 나머지 계층은 `KakaoConnection` 포트만 본다.
 
@@ -81,7 +81,7 @@ DraftRepliesForChangedRooms (방 정책 평가 → 후보만 Codex 호출 → �
         ↓
 PendingSendStore            (자동 전송 방인 경우에만 대기열 적재)
         ↓
-ProcessSendQueue            (주기적으로 SendGate 재검사 → 통과 시 katok send)
+ProcessSendQueue            (SendGate 재검사 → 직접 AX 또는 katok send --via ax)
 ```
 
 각 단계는 자기 위층을 모른다. 감지는 정책을 모르고, 정책 판정은 전송을 모르며, 전송은 어떤 모델이 답을 만들었는지 모른다.
