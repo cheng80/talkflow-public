@@ -23,6 +23,7 @@ public struct ActivityRow: Identifiable, Equatable, Sendable {
     /// as one story: the draft row holds the model's seconds and the delivery row
     /// holds the queue's, and no single row holds both.
     public let timeline: ActionTimeline
+    let timing: ActivityTiming
 
     /// The row's identity *is* the newest event's id, so selection stays an
     /// `Int64` and the detail pane keeps working on an `AgentAction` unchanged.
@@ -82,6 +83,10 @@ public struct ActivityRow: Identifiable, Equatable, Sendable {
         let ordered = actions.sorted { $0.id < $1.id }
         self.actions = ordered
         timeline = ordered.reduce(ActionTimeline()) { $0.merging($1.timeline) }
+        // A retry must not extend the time attributed to waiting for review.
+        let firstAttempt = ordered.lazy.flatMap(\.timeline.steps)
+            .filter { $0.stage == .sendAttempted }.map(\.at).min()
+        timing = ActivityTiming(timeline, firstSendAttempt: firstAttempt)
     }
 
     /// Groups a flat history into rows, keeping the order it arrived in.
