@@ -761,7 +761,8 @@ func theRoomIsRecoveredForEveryNoteThatHadOneBeforeItWasKeyedByRoom() async thro
     let database = try TalkFlowDatabase(fileURL: url)
     let notes = PersonNoteRepository(database: database)
 
-    let inStudio = try await #require(notes.note(inRoom: "room-studio", senderID: "s-kang"))
+    let inStudioValue = try await notes.note(inRoom: "room-studio", senderID: "s-kang")
+    let inStudio = try #require(inStudioValue)
     #expect(inStudio.chatRoomID == "room-studio")
     #expect(inStudio.note == "room-studio에서 적은 메모")
     // Everything the old row carried survives the rebuild, the hand-edited flag
@@ -772,7 +773,8 @@ func theRoomIsRecoveredForEveryNoteThatHadOneBeforeItWasKeyedByRoom() async thro
     #expect(inStudio.links.map(\.url) == ["https://example.com/s-kang"])
     #expect(inStudio.links.first?.relation == .made)
 
-    let inFamily = try await #require(notes.note(inRoom: "room-family", senderID: "s-jisu"))
+    let inFamilyValue = try await notes.note(inRoom: "room-family", senderID: "s-jisu")
+    let inFamily = try #require(inFamilyValue)
     #expect(inFamily.note == "room-family에서 적은 메모")
 
     // And the note is only in its own room, which is the whole point of the key.
@@ -807,7 +809,8 @@ func aPinnedNoteComesBackPinned() async throws {
         )
     )
 
-    let read = try await #require(notes.note(inRoom: groupRoom.id, senderID: "s-kang"))
+    let readValue = try await notes.note(inRoom: groupRoom.id, senderID: "s-kang")
+    let read = try #require(readValue)
     #expect(read.isPinned)
     #expect(read.note == "지켜야 하는 문장")
     #expect(read.coveredThroughMessageID == "m-42")
