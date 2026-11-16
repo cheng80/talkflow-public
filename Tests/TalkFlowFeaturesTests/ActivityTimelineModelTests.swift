@@ -16,7 +16,10 @@ private func makeModel(
         reviewDrafts: ReviewDrafts(
             actionLog: log,
             settingsStore: FakeSettingsStore(usePolicyAccepted: usePolicyAccepted),
-            connection: FakeKakaoConnection(statusValue: status),
+            connection: FakeKakaoConnection(
+                statusValue: status,
+                rooms: [ChatRoom(id: "room-a", displayName: "가족", kind: .direct)]
+            ),
             sender: sender
         )
     )

@@ -278,7 +278,7 @@ actor FakeSendStore: PendingSendStore {
 }
 
 actor FakeMessageSender: MessageSender {
-    private(set) var sent: [(text: String, chatRoomID: String)] = []
+    private(set) var sent: [(text: String, chatRoomID: String, chatRoomName: String)] = []
     private let failure: Error?
 
     init(failure: Error? = nil) {
@@ -292,7 +292,7 @@ actor FakeMessageSender: MessageSender {
         origin: SendOrigin
     ) async throws -> SendReceipt {
         if let failure { throw failure }
-        sent.append((text, chatRoomID))
+        sent.append((text, chatRoomID, chatRoomName))
         return SendReceipt(route: .direct)
     }
 }

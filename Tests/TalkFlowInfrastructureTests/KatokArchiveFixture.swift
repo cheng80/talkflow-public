@@ -25,6 +25,7 @@ struct KatokArchiveFixture {
         /// The message this row answers, as KakaoTalk records a 답장. Null on
         /// almost every row in the real archive.
         let replyTo: String?
+        var chatName = "room"
     }
 
     let directoryURL: URL
@@ -107,10 +108,11 @@ struct KatokArchiveFixture {
                     // `chats` has no account column, so the reader uses these rows.
                     let chatType = chats.first { $0.id == message.chatID }?.type ?? "direct"
                     try db.execute(
-                        sql: "INSERT INTO messages VALUES (?, ?, 'room', ?, ?, ?, ?, ?, ?, ?, ?)",
+                        sql: "INSERT INTO messages VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         arguments: [
                             accountHash,
                             message.chatID,
+                            message.chatName,
                             chatType,
                             message.id,
                             message.senderID,

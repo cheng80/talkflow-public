@@ -52,6 +52,7 @@ public struct ReviewDrafts: Sendable {
         // user can watch happening and the one they blame when it is slow.
         var timeline = ActionTimeline().stamping(.sendAttempted)
         let receipt: SendReceipt
+        let room: ChatRoom
 
         // Written down before it is thrown. A failure shown only in the window
         // the user is looking at is gone the moment they look away, and a send
@@ -66,11 +67,15 @@ public struct ReviewDrafts: Sendable {
             guard account.fingerprint == draft.accountFingerprint else {
                 throw ReviewError.accountChanged
             }
+            guard let current = try await connection.chatRooms().first(where: { $0.id == draft.chatRoomID }) else {
+                throw ReviewError.roomUnavailable
+            }
+            room = current
 
             receipt = try await sender.send(
                 text: body,
-                toChatRoomID: draft.chatRoomID,
-                named: draft.chatRoomName,
+                toChatRoomID: room.id,
+                named: room.displayName,
                 // The keyboard rule exists so a send does not land in the middle
                 // of somebody typing. The keystroke that started this one was
                 // theirs, so there is nothing here to interrupt — and refusing
@@ -103,8 +108,8 @@ public struct ReviewDrafts: Sendable {
         try await actionLog.record(
             AgentAction(
                 accountFingerprint: draft.accountFingerprint,
-                chatRoomID: draft.chatRoomID,
-                chatRoomName: draft.chatRoomName,
+                chatRoomID: room.id,
+                chatRoomName: room.displayName,
                 kind: .sent,
                 triggerMessageID: draft.triggerMessageID,
                 replyMode: draft.replyMode,
@@ -159,12 +164,14 @@ public enum ReviewError: LocalizedError {
     case emptyDraft
     case accountUnavailable
     case accountChanged
+    case roomUnavailable
 
     public var errorDescription: String? {
         switch self {
         case .emptyDraft: "보낼 내용이 비어 있습니다."
         case .accountUnavailable: "카카오톡 연결을 확인하지 못했습니다."
         case .accountChanged: "이 초안을 만든 계정과 지금 로그인된 계정이 다릅니다."
+        case .roomUnavailable: "이 초안의 채팅방을 확인하지 못했습니다."
         }
     }
 }

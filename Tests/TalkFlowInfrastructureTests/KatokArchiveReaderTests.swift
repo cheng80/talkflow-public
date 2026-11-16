@@ -201,6 +201,23 @@ func archiveReaderNeverBorrowsAnotherAccountsRows(hasOwnRows: Bool) throws {
 }
 
 @Test
+func renamedRoomKeepsOneIDAndUsesTheCurrentAccountsLatestName() throws {
+    let fixture = try KatokArchiveFixture()
+    defer { fixture.destroy() }
+    var old = message(id: "m1", text: "산책 기록", timestamp: "2026-08-01T10:00:00+00:00")
+    old.chatName = "chat-42"
+    var current = message(id: "m2", text: "다시 산책", timestamp: "2026-08-01T10:01:00+00:00")
+    current.chatName = "한결"
+    var other = message(id: "m3", text: "독서 기록", timestamp: "2026-08-01T10:02:00+00:00")
+    other.chatName = "지수"
+    try fixture.createArchive(chats: [], messages: [old, current], otherAccountMessages: [other])
+
+    let rooms = try KatokArchiveReader(environment: fixture.environment).chatRooms()
+
+    #expect(rooms == [ChatRoom(id: "room-1", displayName: "한결", kind: .direct)])
+}
+
+@Test
 func anUnverifiedAccountCannotOpenAnExistingArchive() throws {
     let fixture = try KatokArchiveFixture()
     defer { fixture.destroy() }

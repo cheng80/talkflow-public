@@ -113,18 +113,24 @@ struct KatokArchiveReader: Sendable {
     }
 
     func chatRooms() throws -> [ChatRoom] {
-        // Rooms come from `messages` rather than `chats` because only `messages`
-        // records which account a room belongs to.
+        // Only `messages` scopes rooms to an account. A renamed room can still
+        // have older messages under its previous name.
         let accountHash = accountHash
         return try database.read { db in
             try Row.fetchAll(
                 db,
                 sql: """
-                SELECT DISTINCT chat_id, chat_name, chat_type
-                FROM messages
-                WHERE account_hash = ?
+                SELECT current.chat_id, current.chat_name, current.chat_type
+                FROM (SELECT DISTINCT chat_id FROM messages WHERE account_hash = ?) AS room
+                JOIN messages AS current ON current.rowid = (
+                    SELECT rowid
+                    FROM messages
+                    WHERE account_hash = ? AND chat_id = room.chat_id
+                    ORDER BY timestamp DESC, message_id DESC
+                    LIMIT 1
+                )
                 """,
-                arguments: [accountHash]
+                arguments: [accountHash, accountHash]
             )
             .compactMap(ChatRoom.init(archiveRow:))
         }

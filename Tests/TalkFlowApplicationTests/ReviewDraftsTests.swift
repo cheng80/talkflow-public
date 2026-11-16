@@ -24,12 +24,13 @@ private func makeReview(
     log: FakeActionLog = FakeActionLog(),
     sender: FakeMessageSender = FakeMessageSender(),
     status: KakaoConnectionStatus = .connected(account: testAccount),
+    rooms: [ChatRoom] = [testDirectRoom],
     sendStore: FakeSendStore? = nil
 ) -> ReviewDrafts {
     ReviewDrafts(
         actionLog: log,
         settingsStore: FakeSettingsStore(),
-        connection: FakeKakaoConnection(status: status),
+        connection: FakeKakaoConnection(status: status, rooms: rooms),
         sender: sender,
         sendStore: sendStore
     )
@@ -100,6 +101,30 @@ func sendingADraftDeliversItAndRecordsTheSend() async throws {
     #expect(await sender.sent.map(\.text) == ["네 좋아요"])
     #expect(await log.recorded.last?.kind == .sent)
     #expect(await log.recorded.last?.detail.contains("검토 후") == true)
+}
+
+@Test
+func reviewingAnOldDraftUsesTheCurrentRoomNameForItsID() async throws {
+    let sender = FakeMessageSender()
+    let renamedRoom = ChatRoom(id: testDirectRoom.id, displayName: "한결", kind: .direct)
+    let review = makeReview(sender: sender, rooms: [testGroupRoom, renamedRoom])
+
+    try await review.send(draft())
+
+    #expect(await sender.sent.map(\.chatRoomID) == [renamedRoom.id])
+    #expect(await sender.sent.map(\.chatRoomName) == ["한결"])
+}
+
+@Test
+func aDraftIsNotSentToAnotherRoomWithTheOldName() async {
+    let sender = FakeMessageSender()
+    let otherRoom = ChatRoom(id: "other-room", displayName: testDirectRoom.displayName, kind: .direct)
+    let review = makeReview(sender: sender, rooms: [otherRoom])
+
+    await #expect(throws: ReviewError.self) {
+        try await review.send(draft())
+    }
+    #expect(await sender.sent.isEmpty)
 }
 
 @Test
