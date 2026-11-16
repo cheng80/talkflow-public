@@ -9,53 +9,39 @@ import TalkFlowDomain
 /// The schema coupling stops with this reader and the row mapping beside it;
 /// callers see domain models.
 struct KatokArchiveReader: Sendable {
-    enum ReadError: LocalizedError {
+    enum ReadError: LocalizedError, Equatable {
         case archiveMissing
+        case accountUnverified
 
         var errorDescription: String? {
-            "카카오톡 대화 아카이브가 아직 없습니다. 동기화를 먼저 실행하세요."
+            switch self {
+            case .archiveMissing: "카카오톡 대화 아카이브가 아직 없습니다. 동기화를 먼저 실행하세요."
+            case .accountUnverified: "현재 카카오톡 계정을 확인할 수 없어 대화를 읽지 않았습니다."
+            }
         }
     }
 
     private let database: DatabaseQueue
-    private let accountSenderID: String?
+    private let accountSenderID: String
     /// katok stores every account it has ever synced in one archive, so reads
     /// have to be scoped. Without this a room list mixes accounts, and a reply
     /// could be drafted from a conversation the signed-in account never had.
-    private let accountHash: String?
+    private let accountHash: String
 
     init(environment: KatokEnvironment = KatokEnvironment()) throws {
         let url = environment.archiveURL
         guard FileManager.default.fileExists(atPath: url.path) else {
             throw ReadError.archiveMissing
         }
+        guard let identity = environment.accountIdentity() else {
+            throw ReadError.accountUnverified
+        }
 
         var configuration = Configuration()
         configuration.readonly = true
         database = try DatabaseQueue(path: url.path, configuration: configuration)
-        accountSenderID = environment.accountIdentity()?.senderID
-        accountHash = Self.accountHash(in: database, senderID: accountSenderID)
-    }
-
-    /// katok's own account key is not derivable from anything TalkFlow holds, so
-    /// it is looked up: the account whose messages this user sent. Falling back
-    /// to the most recently active account keeps a brand-new account, where the
-    /// user has not written yet, from reading as every account at once.
-    private static func accountHash(in database: DatabaseQueue, senderID: String?) -> String? {
-        try? database.read { db in
-            if let senderID,
-               let owned = try String.fetchOne(
-                   db,
-                   sql: "SELECT account_hash FROM messages WHERE sender_id = ? LIMIT 1",
-                   arguments: [senderID]
-               ) {
-                return owned
-            }
-            return try String.fetchOne(
-                db,
-                sql: "SELECT account_hash FROM messages ORDER BY timestamp DESC LIMIT 1"
-            )
-        }
+        accountSenderID = identity.senderID
+        accountHash = identity.archiveHash
     }
 
     /// The name KakaoTalk shows for this account: the nickname stamped on the
@@ -88,7 +74,6 @@ struct KatokArchiveReader: Sendable {
     /// A blank nickname is no nickname: katok writes one for some rows, and an
     /// empty name would match every message ever sent.
     private func newestNickname(inChat chatRoomID: String?) -> String? {
-        guard let accountSenderID else { return nil }
         let accountHash = accountHash
 
         let stored = try? database.read { db -> String? in
@@ -173,27 +158,15 @@ struct KatokArchiveReader: Sendable {
         }
     }
 
-    /// The newest message the archive holds. Compared against KakaoTalk's own
-    /// database to notice when the two have drifted apart.
-    func newestMessageDate() throws -> Date? {
-        let accountHash = accountHash
-        return try database.read { db in
-            let parser = ISO8601DateFormatter()
-            parser.formatOptions = [.withInternetDateTime]
-            return try String.fetchOne(
-                db,
-                sql: "SELECT MAX(timestamp) FROM messages WHERE account_hash = ?",
-                arguments: [accountHash]
-            )
-            .flatMap(parser.date(from:))
-        }
-    }
-
     /// Message and chat totals for the connection status screen.
     func archiveSummary() throws -> (messages: Int, chatRooms: Int) {
         try database.read { db in
-            let messages = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM messages") ?? 0
-            let chatRooms = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM chats") ?? 0
+            let messages = try Int.fetchOne(
+                db, sql: "SELECT COUNT(*) FROM messages WHERE account_hash = ?", arguments: [accountHash]
+            ) ?? 0
+            let chatRooms = try Int.fetchOne(
+                db, sql: "SELECT COUNT(DISTINCT chat_id) FROM messages WHERE account_hash = ?", arguments: [accountHash]
+            ) ?? 0
             return (messages, chatRooms)
         }
     }

@@ -4,20 +4,28 @@ import TalkFlowDomain
 
 /// Locates katok's on-disk state and derives TalkFlow's account identity from it.
 ///
-/// katok owns this directory. TalkFlow only reads it, and never copies the raw
-/// account identifier anywhere: everything outside this type sees the hashed
-/// fingerprint instead.
+/// katok owns its directory. TalkFlow stores the verified account in its own
+/// local cache and exposes a hashed fingerprint to the application.
 struct KatokEnvironment: Sendable {
     struct AccountIdentity: Sendable {
         /// The sender id KakaoTalk stamps on messages this account sent.
         let senderID: String
-        let fingerprint: String
+        let archiveHash: String
+        var fingerprint: String { "katok-\(archiveHash)" }
     }
 
     let dataDirectoryURL: URL
+    private let containerURL: URL
+    private let accountStore: KakaoAccountStore
 
-    init(dataDirectoryURL: URL = KatokEnvironment.defaultDataDirectoryURL()) {
+    init(
+        dataDirectoryURL: URL = KatokEnvironment.defaultDataDirectoryURL(),
+        containerURL: URL = KatokEnvironment.kakaoContainerURL(),
+        accountStore: KakaoAccountStore = KakaoAccountStore()
+    ) {
         self.dataDirectoryURL = dataDirectoryURL
+        self.containerURL = containerURL
+        self.accountStore = accountStore
     }
 
     var archiveURL: URL {
@@ -28,24 +36,28 @@ struct KatokEnvironment: Sendable {
         dataDirectoryURL.appending(path: "kakao/auth.json")
     }
 
-    /// The resolved account wins over the connector's cache. The cache holds
-    /// whichever account was signed in when it was written, and after a switch
-    /// that is the wrong one — using it would mark the wrong messages as "mine".
-    func accountIdentity(accountStore: KakaoAccountStore = KakaoAccountStore()) -> AccountIdentity? {
-        if let resolved = accountStore.storedUserID(),
-           KakaoAccountResolver(environment: self).resolves(userID: resolved) {
-            let senderID = String(resolved)
-            return AccountIdentity(senderID: senderID, fingerprint: Self.fingerprint(for: senderID))
+    func accountIdentity() -> AccountIdentity? {
+        let resolver = KakaoAccountResolver(environment: self)
+        guard let live = resolver.liveDatabaseName() else { return nil }
+        let storeRecord = accountStore.stored()
+        let userID: Int
+        if let storeRecord, storeRecord.databaseName == live {
+            userID = storeRecord.userID
+        } else {
+            let cache = (try? Data(contentsOf: authCacheURL))
+                .flatMap { try? JSONDecoder().decode(AuthCache.self, from: $0) }
+            let candidates = [storeRecord?.userID ?? accountStore.storedUserID(), cache?.userID]
+                .compactMap { $0 }
+            guard let verified = resolver.resolve(candidates: candidates, liveDatabaseName: live) else { return nil }
+            userID = verified
+            try? accountStore.save(userID: userID, databaseName: live)
         }
-
-        guard let data = try? Data(contentsOf: authCacheURL),
-              let cache = try? JSONDecoder().decode(AuthCache.self, from: data)
-        else {
-            return nil
-        }
-
-        let senderID = String(cache.userID)
-        return AccountIdentity(senderID: senderID, fingerprint: Self.fingerprint(for: senderID))
+        let senderID = String(userID)
+        // katok uses SHA-256 of the decimal account ID as its archive key.
+        let hash = SHA256.hash(data: Data(senderID.utf8))
+            .map { String(format: "%02x", $0) }
+            .joined()
+        return AccountIdentity(senderID: senderID, archiveHash: hash)
     }
 
     func accountProfile() -> AccountProfile? {
@@ -58,10 +70,10 @@ struct KatokEnvironment: Sendable {
     /// The connector derives a single name and cannot be told which to read, so
     /// this is how TalkFlow notices it may be reading the wrong one.
     func kakaoDatabases(
-        containerURL: URL = KatokEnvironment.kakaoContainerURL(),
+        containerURL: URL? = nil,
         fileManager: FileManager = .default
     ) -> [(url: URL, modifiedAt: Date)] {
-        let container = containerURL
+        let container = containerURL ?? self.containerURL
         let urls = (try? fileManager.contentsOfDirectory(
             at: container,
             includingPropertiesForKeys: [.contentModificationDateKey],
@@ -80,36 +92,9 @@ struct KatokEnvironment: Sendable {
         }
     }
 
-    /// Environment for every katok invocation.
-    ///
-    /// The connector derives the database name from a cached account id and
-    /// offers no flag to choose a file, so after an account switch it reads the
-    /// account that was signed out. Passing the resolved id overrides that.
-    /// Nothing is passed unless the id still derives the live database, so a
-    /// stale answer cannot silently point katok at the wrong account again.
-    func katokProcessEnvironment(
-        accountStore: KakaoAccountStore = KakaoAccountStore(),
-        resolver: KakaoAccountResolver? = nil
-    ) -> [String: String] {
-        let resolver = resolver ?? KakaoAccountResolver(environment: self)
-        guard let live = resolver.liveDatabaseName() else { return [:] }
-
-        // The hot path is a filename comparison. Deriving a name costs a
-        // 100,000-round PBKDF2, and this runs before every sync — often enough
-        // that re-deriving what has not changed would dominate the sync itself.
-        if let record = accountStore.stored(), record.databaseName == live {
-            return ["KATOK_KAKAO_USER_ID": String(record.userID)]
-        }
-
-        // Either the file changed or the record predates name caching. Derive
-        // once, and remember the answer so the next call is a comparison again.
-        guard let userID = accountStore.storedUserID(),
-              resolver.resolves(userID: userID)
-        else {
-            return [:]
-        }
-        try? accountStore.save(userID: userID, databaseName: live)
-        return ["KATOK_KAKAO_USER_ID": String(userID)]
+    func katokProcessEnvironment() -> [String: String] {
+        guard let identity = accountIdentity() else { return [:] }
+        return ["KATOK_KAKAO_USER_ID": identity.senderID]
     }
 
     /// The device uuid the database name is derived from. Cached by the
@@ -132,13 +117,6 @@ struct KatokEnvironment: Sendable {
     static func defaultDataDirectoryURL() -> URL {
         FileManager.default.homeDirectoryForCurrentUser
             .appending(path: "Library/Application Support/katok")
-    }
-
-    private static func fingerprint(for senderID: String) -> String {
-        let digest = SHA256.hash(data: Data(senderID.utf8))
-            .map { String(format: "%02x", $0) }
-            .joined()
-        return "katok-\(digest)"
     }
 }
 

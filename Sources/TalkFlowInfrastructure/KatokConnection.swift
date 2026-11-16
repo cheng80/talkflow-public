@@ -2,8 +2,7 @@ import Foundation
 import TalkFlowDomain
 
 /// Reads KakaoTalk's locally synchronized data through katok.
-/// The helper is bundled with the distributed app; `scripts/install-katok.sh`
-/// provides the same binary during development.
+/// The build script bundles the user's locally installed helper.
 ///
 /// Live probes go through the CLI because only katok can prove that KakaoTalk's
 /// encrypted database is readable. Bulk reads go through the archive, which is
@@ -28,7 +27,7 @@ public struct KatokConnection: KakaoConnection {
 
     public func status() async -> KakaoConnectionStatus {
         guard let executableURL else {
-            return .unavailable(reason: "katok 실행 파일을 찾지 못했습니다. scripts/install-katok.sh를 실행하세요.")
+            return .unavailable(reason: "katok 실행 파일을 찾지 못했습니다. README의 katok 설치 절차를 확인하세요.")
         }
 
         let katokEnvironment = environment.katokProcessEnvironment()
@@ -53,9 +52,6 @@ public struct KatokConnection: KakaoConnection {
         guard macOS.authCached, let profile = environment.accountProfile() else {
             return .unavailable(reason: "카카오톡 대화는 찾았지만 계정 확인을 마치지 못했습니다.")
         }
-        if let drift = accountDriftReason() {
-            return .unavailable(reason: drift)
-        }
         return .connected(account: profile.named(nickname(for: profile.fingerprint)))
     }
 
@@ -66,38 +62,6 @@ public struct KatokConnection: KakaoConnection {
         nicknames.nickname(forAccount: fingerprint) {
             try? KatokArchiveReader(environment: environment).accountNickname()
         }
-    }
-
-    /// Signing into a different KakaoTalk account leaves the old database in
-    /// place and starts a new one. The connector derives one database name from
-    /// a cached account id and cannot be pointed at another, so it keeps reading
-    /// the account that was signed in when that cache was written.
-    ///
-    /// Reporting "connected" there would be worse than reporting nothing: replies
-    /// would be drafted from one account's conversations and delivered by
-    /// another's KakaoTalk.
-    private func accountDriftReason() -> String? {
-        let databases = environment.kakaoDatabases()
-        guard databases.count > 1, let live = databases.map(\.modifiedAt).max() else { return nil }
-        guard let reader = try? KatokArchiveReader(environment: environment),
-              let newestArchived = try? reader.newestMessageDate()
-        else {
-            return nil
-        }
-
-        guard live.timeIntervalSince(newestArchived) > Self.acceptableDrift else { return nil }
-        return """
-        카카오톡 계정이 바뀐 것으로 보입니다. 읽고 있는 대화가 \(Self.dayCount(from: newestArchived))일 전에서 멈춰 있습니다. \
-        지금 로그인된 계정의 대화를 읽으려면 연결 도구가 새 계정을 인식해야 합니다.
-        """
-    }
-
-    /// A day of slack: KakaoTalk touches its database for reasons other than new
-    /// messages, and a quiet account should not be reported as broken.
-    private static let acceptableDrift: TimeInterval = 86_400
-
-    private static func dayCount(from date: Date) -> Int {
-        max(1, Int(Date().timeIntervalSince(date) / 86_400))
     }
 
     /// Asks KakaoTalk's own chat list which rooms it is showing.
@@ -120,7 +84,7 @@ public struct KatokConnection: KakaoConnection {
     }
 
     public func joinedRoomNames() async -> Set<String>? {
-        guard let executableURL else { return nil }
+        guard executableURL != nil else { return nil }
         let katokEnvironment = environment.katokProcessEnvironment()
 
         async let listed = read(KatokRoomList.self, ["send", "--list-rooms", "--limit", "200", "--json"], katokEnvironment)

@@ -12,43 +12,29 @@ import Foundation
 /// name. An id that derives nothing on disk is not the signed-in account, no
 /// matter which cache it came from.
 struct KakaoAccountResolver: Sendable {
-    struct Resolution: Equatable, Sendable {
-        let userID: Int
-        let databaseName: String
-    }
-
     private let environment: KatokEnvironment
-    private let deviceUUID: String?
 
     init(environment: KatokEnvironment = KatokEnvironment()) {
         self.environment = environment
-        deviceUUID = environment.deviceUUID()
     }
 
     /// The database KakaoTalk has written most recently. Nothing else on disk
     /// distinguishes a live account from one that was signed out months ago.
     func liveDatabaseName() -> String? {
-        environment.kakaoDatabases()
-            .max { $0.modifiedAt < $1.modifiedAt }?
-            .url.lastPathComponent
-    }
-
-    /// Checks a candidate against the live database rather than trusting it.
-    func resolves(userID: Int) -> Bool {
-        guard let deviceUUID, let live = liveDatabaseName() else { return false }
-        return KakaoKeyDerivation.databaseName(userID: userID, deviceUUID: deviceUUID) == live
+        let databases = environment.kakaoDatabases()
+        guard let newest = databases.max(by: { $0.modifiedAt < $1.modifiedAt }),
+              databases.filter({ $0.modifiedAt == newest.modifiedAt }).count == 1
+        else { return nil }
+        return newest.url.lastPathComponent
     }
 
     /// Tries every id TalkFlow knows about and returns the one that derives the
     /// live database. Deriving a name costs a PBKDF2 pass, so callers should
     /// remember the answer rather than resolving on every read.
-    func resolve(candidates: [Int]) -> Resolution? {
-        guard let deviceUUID, let live = liveDatabaseName() else { return nil }
-
-        for candidate in candidates
-        where KakaoKeyDerivation.databaseName(userID: candidate, deviceUUID: deviceUUID) == live {
-            return Resolution(userID: candidate, databaseName: live)
+    func resolve(candidates: [Int], liveDatabaseName: String) -> Int? {
+        guard let deviceUUID = environment.deviceUUID() else { return nil }
+        return candidates.first {
+            KakaoKeyDerivation.databaseName(userID: $0, deviceUUID: deviceUUID) == liveDatabaseName
         }
-        return nil
     }
 }

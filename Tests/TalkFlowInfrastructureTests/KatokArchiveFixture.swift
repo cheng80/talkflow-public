@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import GRDB
 @testable import TalkFlowInfrastructure
@@ -7,6 +8,10 @@ import GRDB
 /// Tests never touch the user's own archive: it holds real conversations, and a
 /// fixture is the only way to assert on specific rows.
 struct KatokArchiveFixture {
+    static let ownID = "1000000000000000001"
+    static let otherID = "1000000000000000002"
+    private static let deviceUUID = "00000000-0000-4000-8000-000000000001"
+
     /// One archived row. A struct rather than the tuple this used to be: at
     /// eight fields the type stopped fitting in the signature that took it.
     struct ArchivedMessage {
@@ -23,20 +28,31 @@ struct KatokArchiveFixture {
     }
 
     let directoryURL: URL
+    let containerURL: URL
+    let databaseURL: URL
 
     var environment: KatokEnvironment {
-        KatokEnvironment(dataDirectoryURL: directoryURL)
+        KatokEnvironment(
+            dataDirectoryURL: directoryURL,
+            containerURL: containerURL,
+            accountStore: KakaoAccountStore(fileURL: directoryURL.appending(path: "resolved-account.json"))
+        )
     }
 
-    init(accountSenderID: String = "1000") throws {
+    init() throws {
         directoryURL = URL(fileURLWithPath: NSTemporaryDirectory())
             .appending(path: "talkflow-fixture-\(UUID().uuidString)")
+        containerURL = directoryURL.appending(path: "container")
+        databaseURL = containerURL.appending(
+            path: KakaoKeyDerivation.databaseName(userID: 1_000_000_000_000_000_001, deviceUUID: Self.deviceUUID)
+        )
         try FileManager.default.createDirectory(
             at: directoryURL.appending(path: "kakao"),
             withIntermediateDirectories: true
         )
-
-        let authCache = ["user_id": Int(accountSenderID) ?? 0, "uuid": 0] as [String: Any]
+        try FileManager.default.createDirectory(at: containerURL, withIntermediateDirectories: true)
+        try Data().write(to: databaseURL)
+        let authCache = ["user_id": 1_000_000_000_000_000_001, "uuid": Self.deviceUUID] as [String: Any]
         try JSONSerialization
             .data(withJSONObject: authCache)
             .write(to: directoryURL.appending(path: "kakao/auth.json"))
@@ -48,7 +64,8 @@ struct KatokArchiveFixture {
 
     func createArchive(
         chats: [(id: String, name: String, type: String)],
-        messages: [ArchivedMessage]
+        messages: [ArchivedMessage],
+        otherAccountMessages: [ArchivedMessage] = []
     ) throws {
         let database = try DatabaseQueue(path: environment.archiveURL.path)
         try database.write { db in
@@ -82,25 +99,29 @@ struct KatokArchiveFixture {
                     arguments: [chat.id, chat.name, chat.type]
                 )
             }
-            for message in messages {
-                // Messages carry the room's type because that is where room
-                // listings read it from; `chats` has no account column and so
-                // cannot be used once an archive holds more than one account.
-                let chatType = chats.first { $0.id == message.chatID }?.type ?? "direct"
-                try db.execute(
-                    sql: "INSERT INTO messages VALUES ('acct', ?, 'room', ?, ?, ?, ?, ?, ?, ?, ?)",
-                    arguments: [
-                        message.chatID,
-                        chatType,
-                        message.id,
-                        message.senderID,
-                        message.nickname,
-                        message.timestamp,
-                        message.text,
-                        message.type,
-                        message.replyTo
-                    ]
-                )
+            let rows = [(Self.ownID, messages), (Self.otherID, otherAccountMessages)]
+            for (accountID, messages) in rows {
+                let accountHash = SHA256.hash(data: Data(accountID.utf8))
+                    .map { String(format: "%02x", $0) }.joined()
+                for message in messages {
+                    // `chats` has no account column, so the reader uses these rows.
+                    let chatType = chats.first { $0.id == message.chatID }?.type ?? "direct"
+                    try db.execute(
+                        sql: "INSERT INTO messages VALUES (?, ?, 'room', ?, ?, ?, ?, ?, ?, ?, ?)",
+                        arguments: [
+                            accountHash,
+                            message.chatID,
+                            chatType,
+                            message.id,
+                            message.senderID,
+                            message.nickname,
+                            message.timestamp,
+                            message.text,
+                            message.type,
+                            message.replyTo
+                        ]
+                    )
+                }
             }
         }
     }

@@ -8,34 +8,34 @@ import TalkFlowDomain
 /// what other people call this account.
 @Test
 func archiveReaderReadsTheAccountsOwnNameOffTheMessagesItSent() throws {
-    let fixture = try KatokArchiveFixture(accountSenderID: "1000")
+    let fixture = try KatokArchiveFixture()
     defer { fixture.destroy() }
     try fixture.createArchive(
         chats: [(id: "room-1", name: "가족", type: "direct")],
         messages: [
-            message(id: "m1", senderID: "2000", nickname: "지수", text: "안녕", timestamp: "2026-08-01T10:00:00+00:00"),
-            message(id: "m2", senderID: "1000", nickname: "달구지톡", text: "응 안녕", timestamp: "2026-08-01T10:01:00+00:00")
+            message(id: "m1", senderID: KatokArchiveFixture.otherID, nickname: "지수", text: "안녕", timestamp: "2026-08-01T10:00:00+00:00"),
+            message(id: "m2", senderID: KatokArchiveFixture.ownID, nickname: "한결", text: "응 안녕", timestamp: "2026-08-01T10:01:00+00:00")
         ]
     )
 
-    #expect(try KatokArchiveReader(environment: fixture.environment).accountNickname() == "달구지톡")
+    #expect(try KatokArchiveReader(environment: fixture.environment).accountNickname() == "한결")
 }
 
 /// Renaming yourself in KakaoTalk leaves every older message under the old name,
 /// so the newest one is the one people are typing today.
 @Test
 func archiveReaderPrefersTheNewestNameWhenTheAccountWasRenamed() throws {
-    let fixture = try KatokArchiveFixture(accountSenderID: "1000")
+    let fixture = try KatokArchiveFixture()
     defer { fixture.destroy() }
     try fixture.createArchive(
         chats: [(id: "room-1", name: "가족", type: "direct")],
         messages: [
-            message(id: "m1", senderID: "1000", nickname: "예전이름", text: "옛날", timestamp: "2026-07-01T10:00:00+00:00"),
-            message(id: "m2", senderID: "1000", nickname: "달구지톡", text: "요즘", timestamp: "2026-08-01T10:00:00+00:00")
+            message(id: "m1", senderID: KatokArchiveFixture.ownID, nickname: "예전이름", text: "옛날", timestamp: "2026-07-01T10:00:00+00:00"),
+            message(id: "m2", senderID: KatokArchiveFixture.ownID, nickname: "한결", text: "요즘", timestamp: "2026-08-01T10:00:00+00:00")
         ]
     )
 
-    #expect(try KatokArchiveReader(environment: fixture.environment).accountNickname() == "달구지톡")
+    #expect(try KatokArchiveReader(environment: fixture.environment).accountNickname() == "한결")
 }
 
 /// A brand-new sign-in has written nothing, so there is no message to read a
@@ -43,12 +43,12 @@ func archiveReaderPrefersTheNewestNameWhenTheAccountWasRenamed() throws {
 /// would have the account answer to a stranger's name.
 @Test
 func archiveReaderReportsNoNameForAnAccountThatHasNeverWritten() throws {
-    let fixture = try KatokArchiveFixture(accountSenderID: "1000")
+    let fixture = try KatokArchiveFixture()
     defer { fixture.destroy() }
     try fixture.createArchive(
         chats: [(id: "room-1", name: "가족", type: "direct")],
         messages: [
-            message(id: "m1", senderID: "2000", nickname: "지수", text: "안녕", timestamp: "2026-08-01T10:00:00+00:00")
+            message(id: "m1", senderID: KatokArchiveFixture.otherID, nickname: "지수", text: "안녕", timestamp: "2026-08-01T10:00:00+00:00")
         ]
     )
 
@@ -62,12 +62,12 @@ func archiveReaderReportsNoNameForAnAccountThatHasNeverWritten() throws {
 /// message ever sent, so it is no name at all.
 @Test
 func archiveReaderTreatsABlankNameAsNoName() throws {
-    let fixture = try KatokArchiveFixture(accountSenderID: "1000")
+    let fixture = try KatokArchiveFixture()
     defer { fixture.destroy() }
     try fixture.createArchive(
         chats: [(id: "room-1", name: "가족", type: "direct")],
         messages: [
-            message(id: "m1", senderID: "1000", nickname: "  ", text: "응", timestamp: "2026-08-01T10:00:00+00:00")
+            message(id: "m1", senderID: KatokArchiveFixture.ownID, nickname: "  ", text: "응", timestamp: "2026-08-01T10:00:00+00:00")
         ]
     )
 
@@ -79,7 +79,7 @@ func archiveReaderTreatsABlankNameAsNoName() throws {
 /// the room where the user renamed themselves stops answering to its own name.
 @Test
 func archiveReaderReadsTheNameTheAccountUsesInEachRoom() throws {
-    let fixture = try KatokArchiveFixture(accountSenderID: "1000")
+    let fixture = try KatokArchiveFixture()
     defer { fixture.destroy() }
     try fixture.createArchive(
         chats: [
@@ -87,14 +87,14 @@ func archiveReaderReadsTheNameTheAccountUsesInEachRoom() throws {
             (id: "room-2", name: "주말 산책", type: "group")
         ],
         messages: [
-            message(id: "m1", chatID: "room-1", senderID: "1000", nickname: "달구지톡", text: "응", timestamp: "2026-08-01T10:00:00+00:00"),
-            message(id: "m2", chatID: "room-2", senderID: "1000", nickname: "모임총무", text: "출발", timestamp: "2026-08-01T11:00:00+00:00")
+            message(id: "m1", chatID: "room-1", senderID: KatokArchiveFixture.ownID, nickname: "한결", text: "응", timestamp: "2026-08-01T10:00:00+00:00"),
+            message(id: "m2", chatID: "room-2", senderID: KatokArchiveFixture.ownID, nickname: "모임총무", text: "출발", timestamp: "2026-08-01T11:00:00+00:00")
         ]
     )
 
     let reader = try KatokArchiveReader(environment: fixture.environment)
 
-    #expect(reader.accountNickname(chatRoomID: "room-1") == "달구지톡")
+    #expect(reader.accountNickname(chatRoomID: "room-1") == "한결")
     #expect(reader.accountNickname(chatRoomID: "room-2") == "모임총무")
     #expect(reader.accountNickname() == "모임총무")
 }
@@ -103,7 +103,7 @@ func archiveReaderReadsTheNameTheAccountUsesInEachRoom() throws {
 /// old name, exactly as renaming the account does.
 @Test
 func archiveReaderPrefersTheNewestNameTheAccountUsedInThatRoom() throws {
-    let fixture = try KatokArchiveFixture(accountSenderID: "1000")
+    let fixture = try KatokArchiveFixture()
     defer { fixture.destroy() }
     try fixture.createArchive(
         chats: [
@@ -111,9 +111,9 @@ func archiveReaderPrefersTheNewestNameTheAccountUsedInThatRoom() throws {
             (id: "room-2", name: "가족", type: "direct")
         ],
         messages: [
-            message(id: "m1", chatID: "room-1", senderID: "1000", nickname: "예전총무", text: "옛날", timestamp: "2026-07-01T10:00:00+00:00"),
-            message(id: "m2", chatID: "room-1", senderID: "1000", nickname: "모임총무", text: "요즘", timestamp: "2026-08-01T10:00:00+00:00"),
-            message(id: "m3", chatID: "room-2", senderID: "1000", nickname: "달구지톡", text: "가장 최근", timestamp: "2026-08-02T10:00:00+00:00")
+            message(id: "m1", chatID: "room-1", senderID: KatokArchiveFixture.ownID, nickname: "예전총무", text: "옛날", timestamp: "2026-07-01T10:00:00+00:00"),
+            message(id: "m2", chatID: "room-1", senderID: KatokArchiveFixture.ownID, nickname: "모임총무", text: "요즘", timestamp: "2026-08-01T10:00:00+00:00"),
+            message(id: "m3", chatID: "room-2", senderID: KatokArchiveFixture.ownID, nickname: "한결", text: "가장 최근", timestamp: "2026-08-02T10:00:00+00:00")
         ]
     )
 
@@ -128,7 +128,7 @@ func archiveReaderPrefersTheNewestNameTheAccountUsedInThatRoom() throws {
 /// call them.
 @Test
 func archiveReaderFallsBackToTheAllRoomsNameWhereTheAccountHasNotWritten() throws {
-    let fixture = try KatokArchiveFixture(accountSenderID: "1000")
+    let fixture = try KatokArchiveFixture()
     defer { fixture.destroy() }
     try fixture.createArchive(
         chats: [
@@ -136,14 +136,14 @@ func archiveReaderFallsBackToTheAllRoomsNameWhereTheAccountHasNotWritten() throw
             (id: "room-2", name: "주말 산책", type: "group")
         ],
         messages: [
-            message(id: "m1", chatID: "room-1", senderID: "1000", nickname: "달구지톡", text: "응", timestamp: "2026-08-01T10:00:00+00:00"),
-            message(id: "m2", chatID: "room-2", senderID: "2000", nickname: "지수", text: "다들 나와요", timestamp: "2026-08-01T11:00:00+00:00")
+            message(id: "m1", chatID: "room-1", senderID: KatokArchiveFixture.ownID, nickname: "한결", text: "응", timestamp: "2026-08-01T10:00:00+00:00"),
+            message(id: "m2", chatID: "room-2", senderID: KatokArchiveFixture.otherID, nickname: "지수", text: "다들 나와요", timestamp: "2026-08-01T11:00:00+00:00")
         ]
     )
 
     #expect(
         try KatokArchiveReader(environment: fixture.environment)
-            .accountNickname(chatRoomID: "room-2") == "달구지톡"
+            .accountNickname(chatRoomID: "room-2") == "한결"
     )
 }
 
@@ -151,7 +151,7 @@ func archiveReaderFallsBackToTheAllRoomsNameWhereTheAccountHasNotWritten() throw
 /// than leaving that room unable to recognise a call.
 @Test
 func archiveReaderFallsBackWhenTheRoomsOwnNameIsBlank() throws {
-    let fixture = try KatokArchiveFixture(accountSenderID: "1000")
+    let fixture = try KatokArchiveFixture()
     defer { fixture.destroy() }
     try fixture.createArchive(
         chats: [
@@ -159,14 +159,14 @@ func archiveReaderFallsBackWhenTheRoomsOwnNameIsBlank() throws {
             (id: "room-2", name: "주말 산책", type: "group")
         ],
         messages: [
-            message(id: "m1", chatID: "room-2", senderID: "1000", nickname: "  ", text: "네", timestamp: "2026-08-01T09:00:00+00:00"),
-            message(id: "m2", chatID: "room-1", senderID: "1000", nickname: "달구지톡", text: "응", timestamp: "2026-08-01T10:00:00+00:00")
+            message(id: "m1", chatID: "room-2", senderID: KatokArchiveFixture.ownID, nickname: "  ", text: "네", timestamp: "2026-08-01T09:00:00+00:00"),
+            message(id: "m2", chatID: "room-1", senderID: KatokArchiveFixture.ownID, nickname: "한결", text: "응", timestamp: "2026-08-01T10:00:00+00:00")
         ]
     )
 
     #expect(
         try KatokArchiveReader(environment: fixture.environment)
-            .accountNickname(chatRoomID: "room-2") == "달구지톡"
+            .accountNickname(chatRoomID: "room-2") == "한결"
     )
 }
 
@@ -174,7 +174,7 @@ func archiveReaderFallsBackWhenTheRoomsOwnNameIsBlank() throws {
 /// a room-scoped answer that never leaves the reader changes nothing.
 @Test
 func theConnectionAnswersWithTheNameTheAccountUsesInThatRoom() async throws {
-    let fixture = try KatokArchiveFixture(accountSenderID: "1000")
+    let fixture = try KatokArchiveFixture()
     defer { fixture.destroy() }
     try fixture.createArchive(
         chats: [
@@ -182,8 +182,8 @@ func theConnectionAnswersWithTheNameTheAccountUsesInThatRoom() async throws {
             (id: "room-2", name: "주말 산책", type: "group")
         ],
         messages: [
-            message(id: "m1", chatID: "room-1", senderID: "1000", nickname: "달구지톡", text: "응", timestamp: "2026-08-01T10:00:00+00:00"),
-            message(id: "m2", chatID: "room-2", senderID: "1000", nickname: "모임총무", text: "출발", timestamp: "2026-08-01T11:00:00+00:00")
+            message(id: "m1", chatID: "room-1", senderID: KatokArchiveFixture.ownID, nickname: "한결", text: "응", timestamp: "2026-08-01T10:00:00+00:00"),
+            message(id: "m2", chatID: "room-2", senderID: KatokArchiveFixture.ownID, nickname: "모임총무", text: "출발", timestamp: "2026-08-01T11:00:00+00:00")
         ]
     )
 
@@ -192,7 +192,7 @@ func theConnectionAnswersWithTheNameTheAccountUsesInThatRoom() async throws {
     let connection = KatokConnection(executableURL: nil, environment: fixture.environment)
     let room = ChatRoom(id: "room-1", displayName: "가족", kind: .direct)
 
-    #expect(await connection.accountNickname(in: room) == "달구지톡")
+    #expect(await connection.accountNickname(in: room) == "한결")
 }
 
 /// A connector that cannot tell rooms apart says nothing rather than repeating
@@ -207,7 +207,7 @@ func aConnectionWithoutPerRoomNamesAnswersWithNothing() async {
 private func message(
     id: String,
     chatID: String = "room-1",
-    senderID: String = "2000",
+    senderID: String = KatokArchiveFixture.otherID,
     nickname: String = "상대",
     text: String,
     timestamp: String,

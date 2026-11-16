@@ -60,14 +60,14 @@ func archiveReaderReturnsNewestMessagesInChronologicalOrder() throws {
 
 @Test
 func archiveReaderMarksOwnMessagesAndNonTextMessages() throws {
-    let fixture = try KatokArchiveFixture(accountSenderID: "1000")
+    let fixture = try KatokArchiveFixture()
     defer { fixture.destroy() }
     try fixture.createArchive(
         chats: [(id: "room-1", name: "가족", type: "direct")],
         messages: [
-            message(id: "m1", senderID: "2000", text: "안녕", timestamp: "2026-08-01T10:00:00+00:00"),
-            message(id: "m2", senderID: "1000", text: "응 안녕", timestamp: "2026-08-01T10:01:00+00:00"),
-            message(id: "m3", senderID: "2000", text: "", timestamp: "2026-08-01T10:02:00+00:00", type: "type_2")
+            message(id: "m1", senderID: KatokArchiveFixture.otherID, text: "안녕", timestamp: "2026-08-01T10:00:00+00:00"),
+            message(id: "m2", senderID: KatokArchiveFixture.ownID, text: "응 안녕", timestamp: "2026-08-01T10:01:00+00:00"),
+            message(id: "m3", senderID: KatokArchiveFixture.otherID, text: "", timestamp: "2026-08-01T10:02:00+00:00", type: "type_2")
         ]
     )
 
@@ -112,16 +112,16 @@ func archiveReaderTellsPhotosApartFromTheOtherNonTextRows() throws {
 /// dropped on the floor unless it is read off the row and carried along.
 @Test
 func archiveReaderCarriesTheMessageAReplyWasAnsweringTo() throws {
-    let fixture = try KatokArchiveFixture(accountSenderID: "1000")
+    let fixture = try KatokArchiveFixture()
     defer { fixture.destroy() }
     try fixture.createArchive(
         chats: [(id: "room-1", name: "가족", type: "direct")],
         messages: [
-            message(id: "m1", senderID: "1000", text: "저녁 뭐 먹지", timestamp: "2026-08-01T10:00:00+00:00"),
-            message(id: "m2", senderID: "2000", text: "그러게", timestamp: "2026-08-01T10:01:00+00:00"),
+            message(id: "m1", senderID: KatokArchiveFixture.ownID, text: "저녁 뭐 먹지", timestamp: "2026-08-01T10:00:00+00:00"),
+            message(id: "m2", senderID: KatokArchiveFixture.otherID, text: "그러게", timestamp: "2026-08-01T10:01:00+00:00"),
             message(
                 id: "m3",
-                senderID: "2000",
+                senderID: KatokArchiveFixture.otherID,
                 text: "국수 어때",
                 timestamp: "2026-08-01T10:02:00+00:00",
                 replyTo: "m1"
@@ -175,10 +175,51 @@ func archiveReaderIgnoresOtherChatRooms() throws {
     #expect(try reader.archiveSummary() == (messages: 2, chatRooms: 2))
 }
 
+@Test(arguments: [true, false])
+func archiveReaderNeverBorrowsAnotherAccountsRows(hasOwnRows: Bool) throws {
+    let fixture = try KatokArchiveFixture()
+    defer { fixture.destroy() }
+    try fixture.createArchive(
+        chats: [
+            (id: "room-1", name: "산책 모임", type: "direct"),
+            (id: "room-2", name: "독서 모임", type: "direct")
+        ],
+        messages: hasOwnRows ? [
+            message(id: "m1", text: "산책 갈까요", timestamp: "2026-08-01T10:00:00+00:00")
+        ] : [],
+        otherAccountMessages: [
+            message(id: "m2", chatID: "room-2", senderID: KatokArchiveFixture.ownID, nickname: "한결",
+                    text: "책 챙겼어요", timestamp: "2026-08-01T10:01:00+00:00")
+        ]
+    )
+
+    let reader = try KatokArchiveReader(environment: fixture.environment)
+    #expect(try reader.chatRooms().map(\.id) == (hasOwnRows ? ["room-1"] : []))
+    #expect(try reader.recentMessages(chatRoomID: "room-2", limit: 10).isEmpty)
+    #expect(try reader.accountNickname() == nil)
+    #expect(try reader.archiveSummary() == (messages: hasOwnRows ? 1 : 0, chatRooms: hasOwnRows ? 1 : 0))
+}
+
+@Test
+func anUnverifiedAccountCannotOpenAnExistingArchive() throws {
+    let fixture = try KatokArchiveFixture()
+    defer { fixture.destroy() }
+    try fixture.createArchive(chats: [], messages: [])
+    let environment = fixture.environment
+    #expect(environment.accountProfile() != nil)
+
+    try FileManager.default.removeItem(at: fixture.databaseURL)
+
+    #expect(environment.accountProfile() == nil)
+    #expect(throws: KatokArchiveReader.ReadError.accountUnverified) {
+        _ = try KatokArchiveReader(environment: environment)
+    }
+}
+
 private func message(
     id: String,
     chatID: String = "room-1",
-    senderID: String = "2000",
+    senderID: String = KatokArchiveFixture.otherID,
     nickname: String = "상대",
     text: String,
     timestamp: String,
