@@ -6,8 +6,12 @@ import TalkFlowDomain
 /// The 설정 picker is only real if the id reaches the process. Four settings on
 /// this project have been landed through the domain and the schema and never onto
 /// the command line, so the arguments themselves get a test.
-private func makeWorkspace(modelID: String?) throws -> (CodexWorkspace, () -> Void) {
-    let workspace = try CodexWorkspace(schema: "{}", modelID: modelID)
+private func makeWorkspace(
+    modelID: String?,
+    effort: AIReasoningEffort? = nil
+) throws -> (CodexWorkspace, () -> Void) {
+    let settings = AIRequestSettings(model: AIModelChoice(modelID: modelID), reasoningEffort: effort)
+    let workspace = try CodexWorkspace(schema: "{}", settings: settings)
     return (workspace, workspace.destroy)
 }
 
@@ -31,6 +35,15 @@ func nothingChosenLeavesTheFlagOffEntirely() throws {
     defer { cleanup() }
 
     #expect(workspace.lockedDownArguments.contains("--model") == false)
+    #expect(workspace.lockedDownArguments.contains("--config") == false)
+}
+
+@Test
+func codexDoesNotGetAnEffortUnsupportedByTheSelectedModel() throws {
+    let (workspace, cleanup) = try makeWorkspace(modelID: "gpt-6-luna", effort: .ultra)
+    defer { cleanup() }
+
+    #expect(workspace.lockedDownArguments.contains("--config") == false)
 }
 
 /// The lockdown is the reason these arguments are shared, and a model choice must
@@ -54,7 +67,7 @@ func choosingAModelKeepsEveryLockdownFlag() throws {
 /// is last, and adding `--model` must not have pushed anything past it.
 @Test
 func thePromptMarkerStaysTheLastArgument() throws {
-    let (workspace, cleanup) = try makeWorkspace(modelID: "gpt-5.5")
+    let (workspace, cleanup) = try makeWorkspace(modelID: "gpt-6-luna", effort: .high)
     defer { cleanup() }
 
     #expect(workspace.lockedDownArguments.last == "-")

@@ -34,6 +34,13 @@ public struct TalkFlowDatabase: Sendable {
         Self.registerMigrationsV11toV17(in: &migrator)
         Self.registerMigrationsV18toV22(in: &migrator)
         Self.registerMigrationsV23toV31(in: &migrator)
+        // No rows means no override for any existing model.
+        migrator.registerMigration("v32-ai-reasoning-effort") { db in
+            try db.create(table: "ai_reasoning_efforts") { table in
+                table.column("model_id", .text).notNull().primaryKey()
+                table.column("effort", .text).notNull()
+            }
+        }
 
         return migrator
     }

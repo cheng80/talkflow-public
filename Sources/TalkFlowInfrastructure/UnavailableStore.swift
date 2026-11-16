@@ -104,11 +104,19 @@ public struct UnavailableStore: RoomPolicyStore, AppSettingsStore, AgentActionLo
         throw StoreError.unavailable
     }
 
-    public func aiModel() async throws -> AIModelChoice {
+    public func aiRequestSettings() async throws -> AIRequestSettings {
         throw StoreError.unavailable
     }
 
     public func setAIModel(_ choice: AIModelChoice) async throws {
+        throw StoreError.unavailable
+    }
+
+    public func aiReasoningEfforts() async throws -> [String: AIReasoningEffort] {
+        throw StoreError.unavailable
+    }
+
+    public func setAIReasoningEffort(_ effort: AIReasoningEffort?, forModelID modelID: String) async throws {
         throw StoreError.unavailable
     }
 

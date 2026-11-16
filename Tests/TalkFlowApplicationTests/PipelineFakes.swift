@@ -174,6 +174,7 @@ actor FakeSettingsStore: AppSettingsStore {
 
     private var wakesDisplay: Bool
     private var model: AIModelChoice
+    private var reasoningEfforts: [String: AIReasoningEffort] = [:]
 
     init(
         enabled: Bool = true,
@@ -203,8 +204,14 @@ actor FakeSettingsStore: AppSettingsStore {
     func setSendUsePolicyAccepted(_ accepted: Bool) async throws { usePolicyAccepted = accepted }
     func wakesDisplayToSend() async throws -> Bool { wakesDisplay }
     func setWakesDisplayToSend(_ enabled: Bool) async throws { wakesDisplay = enabled }
-    func aiModel() async throws -> AIModelChoice { model }
+    func aiRequestSettings() async throws -> AIRequestSettings {
+        AIRequestSettings(model: model, reasoningEffort: model.modelID.flatMap { reasoningEfforts[$0] })
+    }
     func setAIModel(_ choice: AIModelChoice) async throws { model = choice }
+    func aiReasoningEfforts() async throws -> [String: AIReasoningEffort] { reasoningEfforts }
+    func setAIReasoningEffort(_ effort: AIReasoningEffort?, forModelID modelID: String) async throws {
+        reasoningEfforts[modelID] = effort
+    }
 }
 
 /// Unlocks on wake, the way macOS does inside the password grace period.

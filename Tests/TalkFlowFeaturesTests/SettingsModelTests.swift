@@ -162,7 +162,7 @@ func pickingAModelIsWrittenImmediatelyRatherThanWaitingForSave() async throws {
     #expect(model.aiModel == .pinned(.named("gpt-5.6-terra")))
     #expect(model.hasUnsavedChanges == false)
     #expect(
-        try await eventually { try await store.aiModel() == .pinned(.named("gpt-5.6-terra")) }
+        try await eventually { try await store.aiRequestSettings().model == .pinned(.named("gpt-5.6-terra")) }
     )
 }
 
@@ -207,6 +207,29 @@ func theCatalogIsOfferedUnchangedWhenTheChoiceIsAKnownOneOrNone() async {
     let none = SettingsModel(settings: ManageAppSettings(store: FakeSettingsStore()))
     await none.loadIfNeeded()
     #expect(none.aiModelOptions == AIModel.catalog)
+}
+
+@Test @MainActor
+func reasoningLevelsFollowTheModelAndRestoreItsSavedChoice() async throws {
+    let store = FakeSettingsStore(model: .pinned(.named("gpt-6.1-sol")))
+    let model = SettingsModel(settings: ManageAppSettings(store: store))
+    await model.loadIfNeeded()
+
+    await model.setAIReasoningEffort(.ultra)
+    #expect(model.aiReasoningEffort == .ultra)
+    #expect(!model.hasUnsavedChanges)
+
+    model.setAIModel(.pinned(.named("gpt-6-luna")))
+    #expect(!model.aiModel.reasoningEfforts.contains(.ultra))
+    #expect(model.aiReasoningEffort == nil)
+    await model.setAIReasoningEffort(.ultra)
+    await model.setAIReasoningEffort(.low)
+
+    model.setAIModel(.pinned(.named("gpt-6.1-sol")))
+    #expect(model.aiReasoningEffort == .ultra)
+    await model.setAIReasoningEffort(nil)
+    #expect(model.aiReasoningEffort == nil)
+    #expect(try await store.aiReasoningEfforts() == ["gpt-6-luna": .low])
 }
 
 // MARK: - Fixtures

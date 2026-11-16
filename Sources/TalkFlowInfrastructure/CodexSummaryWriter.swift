@@ -28,7 +28,7 @@ public struct CodexSummaryWriter: ConversationSummaryWriter {
     private let executableURL: URL?
     /// Read on every call, for the reason the reply generator reads it on every
     /// call: this one is started at launch and refreshes rooms for days.
-    private let model: @Sendable () async -> AIModelChoice
+    private let settings: @Sendable () async -> AIRequestSettings
     private let promptBuilder = ConversationSummaryPromptBuilder()
 
     /// `people` is required and may be empty, for the reason `decline_reason` is
@@ -74,10 +74,10 @@ public struct CodexSummaryWriter: ConversationSummaryWriter {
 
     public init(
         fileManager: FileManager = .default,
-        model: @escaping @Sendable () async -> AIModelChoice
+        settings: @escaping @Sendable () async -> AIRequestSettings
     ) {
         executableURL = CodexCLIConnection.findExecutable(using: fileManager)
-        self.model = model
+        self.settings = settings
     }
 
     public func writeSummary(_ request: ConversationSummaryRequest) async throws -> ConversationSummaryResult {
@@ -85,7 +85,7 @@ public struct CodexSummaryWriter: ConversationSummaryWriter {
 
         let workspace = try CodexWorkspace(
             schema: Self.responseSchema,
-            modelID: await model().modelID
+            settings: await settings()
         )
         defer { workspace.destroy() }
 

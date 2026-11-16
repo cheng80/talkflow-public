@@ -31,7 +31,9 @@ enum TalkFlowComposition {
             },
             automaticResponsesEnabled: { await responseControl.isEnabled }
         ))
-        let model = aiModel(settingsStore: settingsStore)
+        let aiSettings: @Sendable () async -> AIRequestSettings = {
+            (try? await settings.aiRequestSettings()) ?? .codexDefault
+        }
 
         let models = TalkFlowModels(
             responseControl: responseControl,
@@ -53,7 +55,7 @@ enum TalkFlowComposition {
                 manage: ManageConversationSummary(
                     connection: kakao,
                     summaryStore: summaryStore,
-                    writer: CodexSummaryWriter(model: model),
+                    writer: CodexSummaryWriter(settings: aiSettings),
                     personNotes: personNotes,
                     policyStore: policyStore,
                     actionLog: actionLog
@@ -135,7 +137,7 @@ enum TalkFlowComposition {
                 policyStore: policyStore,
                 settingsStore: settingsStore,
                 actionLog: actionLog,
-                generator: CodexReplyGenerator(model: model),
+                generator: CodexReplyGenerator(settings: aiSettings),
                 sendStore: sendStore,
                 photoSource: KatokPhotoExtractor(),
                 linkSource: WebKitLinkReader(),
@@ -160,7 +162,7 @@ enum TalkFlowComposition {
                 policyStore: policyStore,
                 settingsStore: settingsStore,
                 actionLog: actionLog,
-                generator: CodexReplyGenerator(model: model),
+                generator: CodexReplyGenerator(settings: aiSettings),
                 sendStore: sendStore,
                 summaryStore: summaryStore
             )
@@ -174,7 +176,7 @@ enum TalkFlowComposition {
                 policyStore: policyStore,
                 settingsStore: settingsStore,
                 summaryStore: summaryStore,
-                writer: CodexSummaryWriter(model: model),
+                writer: CodexSummaryWriter(settings: aiSettings),
                 personNotes: personNotes,
                 actionLog: actionLog
             )
@@ -188,18 +190,6 @@ enum TalkFlowComposition {
             fallback: KatokMessageSender(authorization: authorization),
             authorization: authorization
         )
-    }
-
-    /// Every AI call asks which model to use, at the moment it calls, so a change
-    /// in 설정 lands on the next reply instead of the next launch.
-    ///
-    /// A failed read falls back to 선택 안 함 rather than to a model of its own.
-    /// That is the behaviour the app already had, and the alternative is a
-    /// database hiccup taking every reply down with it.
-    private static func aiModel(
-        settingsStore: any AppSettingsStore
-    ) -> @Sendable () async -> AIModelChoice {
-        { (try? await settingsStore.aiModel()) ?? .codexDefault }
     }
 
     private static func policyStore() -> any RoomPolicyStore {

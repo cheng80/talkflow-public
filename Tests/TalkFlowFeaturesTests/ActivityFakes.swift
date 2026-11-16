@@ -173,6 +173,7 @@ actor FakeSettingsStore: AppSettingsStore {
     private var accepted: Bool
     private var wakes = true
     private var model: AIModelChoice
+    private var reasoningEfforts: [String: AIReasoningEffort] = [:]
     private var loadFailures: Int
     private var saveFailures: Int
 
@@ -235,8 +236,14 @@ actor FakeSettingsStore: AppSettingsStore {
     func setSendUsePolicyAccepted(_ accepted: Bool) async throws { self.accepted = accepted }
     func wakesDisplayToSend() async throws -> Bool { wakes }
     func setWakesDisplayToSend(_ enabled: Bool) async throws { wakes = enabled }
-    func aiModel() async throws -> AIModelChoice { model }
+    func aiRequestSettings() async throws -> AIRequestSettings {
+        AIRequestSettings(model: model, reasoningEffort: model.modelID.flatMap { reasoningEfforts[$0] })
+    }
     func setAIModel(_ choice: AIModelChoice) async throws { model = choice }
+    func aiReasoningEfforts() async throws -> [String: AIReasoningEffort] { reasoningEfforts }
+    func setAIReasoningEffort(_ effort: AIReasoningEffort?, forModelID modelID: String) async throws {
+        reasoningEfforts[modelID] = effort
+    }
 }
 
 actor FakeMessageSender: MessageSender {

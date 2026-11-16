@@ -276,6 +276,8 @@ kakaocli도 같은 순서다: `activate` → 채팅 탭 `AXPress` → 행 선택
 
 추론 강도는 축이 다르다. 캐시의 `supported_reasoning_levels`는 `low·medium·high·xhigh·max·ultra`이고 모델마다 다르다(`gpt-5.6-luna`는 `ultra`가 없고, `gpt-5.5`·`gpt-5.4`는 `xhigh`까지다). **`codex exec`에는 이것을 넘기는 플래그가 없다.** `-c model_reasoning_effort=high`처럼 설정 덮어쓰기로만 넘길 수 있다.
 
+재확인 (2026-11-17 · codex-cli 0.169.0-alpha.11.1): 현재 목록의 `gpt-6-luna`는 `low`부터 `max`까지, 나머지 네 모델은 `ultra`도 지원한다고 캐시에 기록돼 있다. 임시 TalkFlow 저장소에 Luna의 수준을 `low`에서 `high`로 바꾸고 같은 합성 대화로 `CodexReplyGenerator`를 두 번 호출했다. 두 호출 모두 초안을 생성했고 CLI가 보고한 `reasoning effort`가 저장한 값과 일치했다.
+
 ### 5.2 모르는 모델 이름은 CLI가 아니라 API가 거절한다
 
 `--model`에 없는 이름을 줘도 CLI는 그대로 받아들이고 실행한다. 실패는 요청이 나간 뒤에 온다.

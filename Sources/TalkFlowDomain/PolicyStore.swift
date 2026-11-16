@@ -75,6 +75,8 @@ public protocol AppSettingsStore: Sendable {
     /// real answer — leave the flag off and let Codex CLI's own config decide —
     /// and an Optional would let a caller treat "not chosen" as "not loaded" and
     /// go looking for a fallback of its own.
-    func aiModel() async throws -> AIModelChoice
+    func aiRequestSettings() async throws -> AIRequestSettings
     func setAIModel(_ choice: AIModelChoice) async throws
+    func aiReasoningEfforts() async throws -> [String: AIReasoningEffort]
+    func setAIReasoningEffort(_ effort: AIReasoningEffort?, forModelID modelID: String) async throws
 }

@@ -77,11 +77,7 @@ struct SettingsView: View {
             // Below the save bar, with the switches, because it writes itself the
             // moment it is picked. Above 자동 전송, because this screen reads in the
             // order the work happens: what the answer is, then whether it goes.
-            SettingsAIModelSection(
-                choice: model.aiModel,
-                options: model.aiModelOptions,
-                onChange: { model.setAIModel($0) }
-            )
+            SettingsAIModelSection(model: model)
 
             Section("자동 전송") {
                 SettingHelpRow("전송 이용 정책과 면책 고지에 동의합니다", help: .sendUsePolicy) {

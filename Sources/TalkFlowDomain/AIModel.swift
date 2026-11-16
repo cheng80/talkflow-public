@@ -11,42 +11,52 @@ public struct AIModel: Identifiable, Hashable, Sendable {
     public let name: String
     /// One line. The picker is scanned, not studied.
     public let summary: String
+    public let reasoningEfforts: [AIReasoningEffort]
 
-    public init(id: String, name: String, summary: String) {
+    public init(id: String, name: String, summary: String, reasoningEfforts: [AIReasoningEffort] = []) {
         self.id = id
         self.name = name
         self.summary = summary
+        self.reasoningEfforts = reasoningEfforts
     }
 }
 
 public extension AIModel {
+    private static let standardReasoning: [AIReasoningEffort] = [.low, .medium, .high, .xhigh, .max]
+    private static let reasoningWithUltra = standardReasoning + [.ultra]
+
     /// Models that returned valid output using TalkFlow's reply schema.
     /// Keep saved choices outside this list visible through `named(_:)`.
     static let catalog: [AIModel] = [
         AIModel(
             id: "gpt-6-astra",
             name: "GPT-6 Astra",
-            summary: "복잡한 요청을 처리하는 최상위 모델입니다."
+            summary: "복잡한 요청을 처리하는 최상위 모델입니다.",
+            reasoningEfforts: reasoningWithUltra
         ),
         AIModel(
             id: "gpt-6.1-sol",
             name: "GPT-6.1 Sol",
-            summary: "복잡한 작업에서 품질과 사용량의 균형을 맞춘 모델입니다."
+            summary: "복잡한 작업에서 품질과 사용량의 균형을 맞춘 모델입니다.",
+            reasoningEfforts: reasoningWithUltra
         ),
         AIModel(
             id: "gpt-6.1-terra",
             name: "GPT-6.1 Terra",
-            summary: "글쓰기와 이미지 이해에 적합한 빠른 모델입니다."
+            summary: "글쓰기와 이미지 이해에 적합한 빠른 모델입니다.",
+            reasoningEfforts: reasoningWithUltra
         ),
         AIModel(
             id: "gpt-6-sol",
             name: "GPT-6 Sol",
-            summary: "6.1 이전의 범용 Sol 모델입니다."
+            summary: "6.1 이전의 범용 Sol 모델입니다.",
+            reasoningEfforts: reasoningWithUltra
         ),
         AIModel(
             id: "gpt-6-luna",
             name: "GPT-6 Luna",
-            summary: "짧은 답변이나 반복 작업의 사용량을 줄이는 모델입니다."
+            summary: "짧은 답변이나 반복 작업의 사용량을 줄이는 모델입니다.",
+            reasoningEfforts: standardReasoning
         )
     ]
 
@@ -80,6 +90,11 @@ public extension AIModel {
 public enum AIModelChoice: Hashable, Sendable {
     case codexDefault
     case pinned(AIModel)
+
+    public var reasoningEfforts: [AIReasoningEffort] {
+        guard case let .pinned(model) = self else { return [] }
+        return model.reasoningEfforts
+    }
 
     /// The value `-m` should be given, or nil when the flag must be left off.
     /// Also what gets stored: the choice is one nullable column, not a column

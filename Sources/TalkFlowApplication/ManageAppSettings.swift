@@ -57,11 +57,19 @@ public struct ManageAppSettings: Sendable {
         try await store.setWakesDisplayToSend(enabled)
     }
 
-    public func aiModel() async throws -> AIModelChoice {
-        try await store.aiModel()
+    public func aiRequestSettings() async throws -> AIRequestSettings {
+        try await store.aiRequestSettings()
     }
 
     public func setAIModel(_ choice: AIModelChoice) async throws {
         try await store.setAIModel(choice)
+    }
+
+    public func aiReasoningEfforts() async throws -> [String: AIReasoningEffort] {
+        try await store.aiReasoningEfforts()
+    }
+
+    public func setAIReasoningEffort(_ effort: AIReasoningEffort?, forModelID modelID: String) async throws {
+        try await store.setAIReasoningEffort(effort, forModelID: modelID)
     }
 }

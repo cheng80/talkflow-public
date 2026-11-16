@@ -44,10 +44,12 @@ public final class SettingsModel {
     /// so a staged value would have the screen name one model while another kept
     /// answering until 저장 was pressed.
     public private(set) var aiModel: AIModelChoice = .codexDefault
+    public private(set) var isSavingReasoningEffort = false
     public private(set) var failure: String?
 
     private let settings: ManageAppSettings
     private var isLoading = false
+    private var reasoningEfforts: [String: AIReasoningEffort] = [:]
 
     public init(settings: ManageAppSettings) {
         self.settings = settings
@@ -79,7 +81,8 @@ public final class SettingsModel {
             let launches = try await settings.launchesAtLogin()
             let accepted = try await settings.sendUsePolicyAccepted()
             let wakes = try await settings.wakesDisplayToSend()
-            let model = try await settings.aiModel()
+            let ai = try await settings.aiRequestSettings()
+            let efforts = try await settings.aiReasoningEfforts()
 
             savedStyle = style
             draftStyle = style
@@ -88,7 +91,8 @@ public final class SettingsModel {
             launchesAtLogin = launches
             sendUsePolicyAccepted = accepted
             wakesDisplayToSend = wakes
-            aiModel = model
+            aiModel = ai.model
+            reasoningEfforts = efforts
             failure = nil
             hasLoaded = true
         } catch {
@@ -228,6 +232,25 @@ public final class SettingsModel {
             } catch {
                 failure = error.localizedDescription
             }
+        }
+    }
+
+    public var aiReasoningEffort: AIReasoningEffort? {
+        guard let id = aiModel.modelID else { return nil }
+        return AIRequestSettings(model: aiModel, reasoningEffort: reasoningEfforts[id]).reasoningEffort
+    }
+
+    public func setAIReasoningEffort(_ effort: AIReasoningEffort?) async {
+        guard hasLoaded, !isSavingReasoningEffort, let id = aiModel.modelID else { return }
+        if let effort, !aiModel.reasoningEfforts.contains(effort) { return }
+        isSavingReasoningEffort = true
+        defer { isSavingReasoningEffort = false }
+        do {
+            try await settings.setAIReasoningEffort(effort, forModelID: id)
+            reasoningEfforts[id] = effort
+            failure = nil
+        } catch {
+            failure = error.localizedDescription
         }
     }
 

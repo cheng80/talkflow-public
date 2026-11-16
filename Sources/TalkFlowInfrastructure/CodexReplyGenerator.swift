@@ -26,7 +26,7 @@ public struct CodexReplyGenerator: ReplyGenerator {
     /// send consent. The pipeline is built at launch and runs for days, so a
     /// captured value would have 설정 show one model while another kept answering
     /// until the app was restarted.
-    private let model: @Sendable () async -> AIModelChoice
+    private let settings: @Sendable () async -> AIRequestSettings
     private let promptBuilder = ReplyPromptBuilder()
     /// Answering a message and opening a subject are different prompts on the
     /// same call: same lockdown, same schema, same parse. Only the words differ.
@@ -62,15 +62,16 @@ public struct CodexReplyGenerator: ReplyGenerator {
     }
     """
 
-    /// No default for `model`. A call that forgot it would silently answer with
-    /// whatever some other project left in `~/.codex/config.toml`, which is the
-    /// thing this argument exists to stop.
     public init(
         fileManager: FileManager = .default,
-        model: @escaping @Sendable () async -> AIModelChoice
+        settings: @escaping @Sendable () async -> AIRequestSettings
     ) {
-        executableURL = CodexCLIConnection.findExecutable(using: fileManager)
-        self.model = model
+        self.init(executableURL: CodexCLIConnection.findExecutable(using: fileManager), settings: settings)
+    }
+
+    init(executableURL: URL?, settings: @escaping @Sendable () async -> AIRequestSettings) {
+        self.executableURL = executableURL
+        self.settings = settings
     }
 
     public func generateReply(_ request: ReplyDraftRequest) async throws -> ReplyDraft {
@@ -84,7 +85,7 @@ public struct CodexReplyGenerator: ReplyGenerator {
         }
         let workspace = try CodexWorkspace(
             schema: Self.responseSchema,
-            modelID: await model().modelID
+            settings: await settings()
         )
         defer { workspace.destroy() }
 

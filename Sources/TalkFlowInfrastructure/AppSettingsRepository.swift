@@ -10,7 +10,7 @@ public struct AppSettingsRepository: AppSettingsStore {
         var wakesDisplayToSend = true
     }
 
-    private let database: TalkFlowDatabase
+    let database: TalkFlowDatabase
 
     public init(database: TalkFlowDatabase) {
         self.database = database
@@ -134,16 +134,6 @@ public struct AppSettingsRepository: AppSettingsStore {
 
     public func setWakesDisplayToSend(_ enabled: Bool) async throws {
         try await update { $0.wakesDisplayToSend = enabled }
-    }
-
-    /// A missing row and a null column both read as 선택 안 함, which is correct:
-    /// the column arrived null on every machine that upgraded.
-    public func aiModel() async throws -> AIModelChoice {
-        try await database.queue.read { db in
-            AIModelChoice(
-                modelID: try String.fetchOne(db, sql: "SELECT ai_model FROM app_settings WHERE id = 1")
-            )
-        }
     }
 
     /// Writes its own column only, the way 답변 조건 does in the row above. The

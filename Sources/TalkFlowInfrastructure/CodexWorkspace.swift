@@ -1,4 +1,5 @@
 import Foundation
+import TalkFlowDomain
 
 /// A throwaway directory holding the schema Codex validates against and the file
 /// it writes its final message into.
@@ -9,20 +10,15 @@ import Foundation
 /// not the caller's to vary.
 struct CodexWorkspace {
     let directoryURL: URL
-    /// What `-m` should be given, or nil to leave the flag off entirely and let
-    /// `~/.codex/config.toml` pick. Carried here rather than added by each caller
-    /// for the same reason the lockdown flags are: 답장 and 채팅방 요약 are the
-    /// user's two AI calls, and a picker that only reached one of them would have
-    /// the 설정 screen naming a model that half the calls ignore.
-    let modelID: String?
+    private let settings: AIRequestSettings
 
     var schemaURL: URL { directoryURL.appending(path: "schema.json") }
     var responseURL: URL { directoryURL.appending(path: "response.json") }
 
-    init(schema: String, modelID: String?) throws {
+    init(schema: String, settings: AIRequestSettings) throws {
         directoryURL = URL(fileURLWithPath: NSTemporaryDirectory())
             .appending(path: "talkflow-codex-\(UUID().uuidString)")
-        self.modelID = modelID
+        self.settings = settings
         try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
         try Data(schema.utf8).write(to: schemaURL)
     }
@@ -55,8 +51,11 @@ struct CodexWorkspace {
             "--output-schema", schemaURL.path,
             "--output-last-message", responseURL.path
         ]
-        if let modelID {
+        if let modelID = settings.model.modelID {
             arguments.append(contentsOf: ["--model", modelID])
+        }
+        if let effort = settings.reasoningEffort {
+            arguments.append(contentsOf: ["--config", "model_reasoning_effort=\(effort.rawValue)"])
         }
         // Last, always. `-` means "read the prompt from stdin", and anything that
         // takes a list of values — `--image` does — swallows it as a file name.

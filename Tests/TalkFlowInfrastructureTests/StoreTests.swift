@@ -484,19 +484,19 @@ func theModelChoiceAndTheSwitchesDoNotOverwriteEachOther() async throws {
     defer { cleanup() }
     let repository = AppSettingsRepository(database: database)
 
-    #expect(try await repository.aiModel() == .codexDefault)
+    #expect(try await repository.aiRequestSettings().model == .codexDefault)
 
     try await repository.setAIModel(.pinned(.named("gpt-5.6-terra")))
     try await repository.setGlobalResponsesEnabled(true)
     try await repository.setWakesDisplayToSend(false)
 
-    #expect(try await repository.aiModel() == .pinned(.named("gpt-5.6-terra")))
+    #expect(try await repository.aiRequestSettings().model == .pinned(.named("gpt-5.6-terra")))
     #expect(try await repository.globalResponsesEnabled())
     #expect(try await repository.wakesDisplayToSend() == false)
 
     try await repository.setAIModel(.codexDefault)
 
-    #expect(try await repository.aiModel() == .codexDefault)
+    #expect(try await repository.aiRequestSettings().model == .codexDefault)
     #expect(try await repository.globalResponsesEnabled())
 }
 
