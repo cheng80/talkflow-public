@@ -66,22 +66,23 @@ AI 제공자로 나가야 합니다. 방 설정에 따라 사진, 링크가 가�
 대화 감지가 「응답 없음」이면 전체 디스크 접근과 macOS 권한 요청 창을 확인하세요
 ([PLATFORM-FINDINGS 8.2](docs/PLATFORM-FINDINGS.md)).
 
-`cheng80/katok`은 비공개이며 공개 설치 파일은 없습니다. 접근 권한이 있는 사용자가
-직접 체크아웃을 빌드합니다. 아래는 TalkFlow 연동 계약을 확인한 소스 리비전입니다.
+`cheng80/katok`은 비공개이며 공개 설치 파일은 없습니다. 접근 권한이 있는 사용자는
+아래 커밋을 체크아웃해 빌드합니다. 이미 `../katok`을 받아 두었다면
+`git -C ../katok fetch origin main`을 실행한 뒤 `checkout` 단계부터 진행하세요.
 
 ```bash
 git clone https://github.com/cheng80/katok.git ../katok
-git -C ../katok checkout --detach 592565a25ead05b46010000f220373ce3ed24acc
+git -C ../katok checkout --detach 25857feffe55ff70aa66eea8268e80ef4504d1d5
 scripts/install-katok.sh ../katok
 ```
 
 스크립트는 `/opt/homebrew/bin`에 설치합니다. 해당 경로를 쓸 수 없다면 두 번째
-인자로 `/usr/local/bin`을 지정할 수 있습니다. 설치 뒤 앱 번들을 빌드하세요.
-katok이 들어간 번들은 이 Mac에서 사용합니다.
+인자로 `/usr/local/bin`을 지정할 수 있습니다. TalkFlow는 번들에 포함된 katok을
+먼저 사용하므로, CLI를 설치하거나 갱신한 뒤 아래 빌드 명령으로 앱도 설치하세요.
 
-위 리비전에는 나와의 채팅 이름 수정이 포함돼 있지 않습니다. 그 방에 전송하려면 해당
-수정이 반영된 비공개 katok 체크아웃을 설치 스크립트에 넘기세요. 이미 아카이브된 방은
-새 메시지가 동기화될 때 현재 이름으로 갱신됩니다.
+이 커밋에는 나와의 채팅을 실제 창 제목으로 동기화하고, 방 ID로 전송할 때 현재 제목을
+사용하는 수정이 포함돼 있습니다. 이미 아카이브된 방 이름은 새 메시지가 동기화될 때
+갱신됩니다.
 
 ## 빌드
 
